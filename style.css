@@ -6,8 +6,8 @@
   --border: #2d2d34;
   --text: #d7d7dc;
   --dim: #8b8b93;
-  --accent: #7b6cff;
-  --accent-2: #4f8cff;
+  --accent: #34d399;
+  --accent-2: #22c55e;
   --danger: #e5484d;
   --clip-video: linear-gradient(180deg, #3d5afe22, #3d5afe11), #2b3b8f;
   --track-h-video: 58px;
@@ -226,7 +226,7 @@ body.track-size-s .clip .handle.r {
 
 body.track-size-s .clip.selected {
   outline-width: 1px;
-  box-shadow: 0 0 0 1px #7b6cff55;
+  box-shadow: 0 0 0 1px #34d39955;
 }
 
 /* ── Title-style picker (inspector) ── */
@@ -262,12 +262,12 @@ body.track-size-s .clip.selected {
 }
 
 .style-opt:hover {
-  background: #7b6cff26;
+  background: #34d39926;
 }
 
 .style-opt.on {
-  color: #cfc8ff;
-  background: #7b6cff14;
+  color: #fff;
+  background: #34d39914;
 }
 
 .ctx-menu {
@@ -289,7 +289,7 @@ body.track-size-s .clip.selected {
   white-space: nowrap;
 }
 .ctx-opt:hover {
-  background: #7b6cff26;
+  background: #34d39926;
 }
 /* media-replace picker reuses .style-menu/.style-opt but lists plain file
    names, not font previews — match the app's normal UI text size */
@@ -352,7 +352,7 @@ body.track-size-s .clip.selected {
 
 .btn.tiny.accent {
   border-color: var(--accent);
-  color: #cfc8ff;
+  color: #fff;
 }
 
 .btn.icon {
@@ -368,8 +368,8 @@ body.track-size-s .clip.selected {
 
 .btn.toggle.on {
   border-color: var(--accent);
-  color: #cfc8ff;
-  background: #7b6cff1a;
+  color: #fff;
+  background: #34d3991a;
 }
 
 /* ── Panels ── */
@@ -463,7 +463,7 @@ body.track-size-s .clip.selected {
 }
 
 .bin-tabs button.on {
-  color: #cfc8ff;
+  color: #fff;
   border-bottom-color: var(--accent);
 }
 
@@ -530,8 +530,8 @@ body.track-size-s .clip.selected {
 
 .bin-item.selected {
   border-color: var(--accent);
-  background: #7b6cff18;
-  box-shadow: inset 0 0 0 1px #7b6cff44;
+  background: #34d39918;
+  box-shadow: inset 0 0 0 1px #34d39944;
 }
 
 .bin-item:active,
@@ -623,7 +623,7 @@ body.track-size-s .clip.selected {
 .bin-drop-root.bin-drop-over {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent);
-  background: #7b6cff18;
+  background: #34d39918;
 }
 
 .bin-drop-root {
@@ -827,12 +827,12 @@ body.track-size-s .clip.selected {
   padding: 1px 2px;
 }
 .insp-row label.kf-graph-toggle:hover {
-  color: #cfc8ff;
-  background: #7b6cff22;
+  color: #fff;
+  background: #34d39922;
 }
 .insp-row label.kf-graph-toggle.on {
-  color: #b9baff;
-  background: #7b6cff33;
+  color: #fff;
+  background: #34d39933;
 }
 .insp-row label.kf-graph-toggle.has-kf::after {
   content: " ◆";
@@ -1000,7 +1000,7 @@ body.track-size-s .clip.selected {
 }
 
 #btnPlay.on {
-  background: #7b6cff;
+  background: #34d399;
   border-color: #9a8fff;
   color: #fff;
   font-size: 19.2px; /* 16px × 1.2 — pause glyph reads smaller than ▶ */
@@ -1015,7 +1015,7 @@ body.track-size-s .clip.selected {
 
 .timecode {
   font: 600 14px/1 "Consolas", monospace;
-  color: #b9b3ff;
+  color: #fff;
   min-width: 86px;
   height: 14px;
   line-height: 14px;
@@ -1048,9 +1048,9 @@ body.track-size-s .clip.selected {
   padding: 7px 9px;
   border-radius: 6px;
   font-size: 11px;
-  color: #cfd0ff;
-  background: #7b6cff1c;
-  border: 1px solid #7b6cff44;
+  color: #fff;
+  background: #34d3991c;
+  border: 1px solid #34d39944;
 }
 
 .insp-section {
@@ -1086,7 +1086,7 @@ body.track-size-s .clip.selected {
 }
 
 .insp-row label.insp-reset:hover {
-  color: #cfc8ff;
+  color: #fff;
 }
 
 .insp-ctrls {
@@ -1329,7 +1329,7 @@ input[type=range] {
 }
 
 .track.drop-hint {
-  background-color: #7b6cff14;
+  background-color: #34d39914;
 }
 
 /* Same-track audio overlap — hatched band over the shared time range */
@@ -1376,7 +1376,7 @@ input[type=range] {
 .clip.selected {
   outline: 2px solid #b9baff;
   outline-offset: -1px;
-  box-shadow: 0 0 0 3px #7b6cff55;
+  box-shadow: 0 0 0 3px #34d39955;
 }
 
 .clip.selected.primary {
@@ -1388,8 +1388,8 @@ input[type=range] {
   position: absolute;
   z-index: 5;
   pointer-events: none;
-  border: 1px solid #7b6cffcc;
-  background: #7b6cff22;
+  border: 1px solid #34d399cc;
+  background: #34d39922;
   border-radius: 2px;
 }
 
@@ -1494,7 +1494,7 @@ body.track-size-s .clip .clip-kf-n {
   cursor: pointer;
 }
 .clip .trans-mark.focused polygon {
-  fill: #7b6cff88;
+  fill: #34d39988;
   stroke: #cfc8ff;
   stroke-width: 1.5;
 }
@@ -1516,7 +1516,7 @@ body.track-size-s .clip .clip-kf-n {
 }
 
 .insp-row.trans-active {
-  background: #7b6cff18;
+  background: #34d39918;
   border-radius: 6px;
   margin: 0 -6px;
   padding: 2px 6px;
@@ -1700,7 +1700,7 @@ body.track-size-s .clip .clip-kf-n {
 
 .engine-opt:has(input:checked) {
   border-color: var(--accent);
-  background: #7b6cff12;
+  background: #34d39912;
 }
 
 .engine-opt:has(input:disabled) {
@@ -1904,8 +1904,8 @@ body.file-drag::after {
   inset: 10px;
   border: 2px dashed var(--accent);
   border-radius: 14px;
-  background: #7b6cff14;
-  color: #cfc8ff;
+  background: #34d39914;
+  color: #fff;
   font-size: 18px;
   font-weight: 600;
   display: flex;

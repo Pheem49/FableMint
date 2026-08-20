@@ -2,7 +2,7 @@
    FableCut landing - hand-built, zero-build, dark theme lock.
    Language: "editing bay" editorial. Heavy grotesk display (Archivo
    Black), hairline rules over boxed cards, restrained color.
-   Accent 1: brand gradient #7b6cff -> #4f8cff (the product's identity),
+   Accent 1: brand gradient #34d399 -> #22c55e (the product's identity),
    used surgically. Accent 2: gold #ffd166, the editor's real timeline
    marker color, used for ticks / nodes / the playhead.
    Radius: 10px panels, pill buttons. One scale, applied everywhere.
@@ -31,10 +31,10 @@
   --text: #f8f8fd;
   --text-dim: #c0c0d2;
   --text-mute: #8686a0;
-  --a1: #9a6bff;
-  --a2: #3f8bff;
+  --a1: #4ade80;
+  --a2: #16a34a;
   --gold: #ffd24a;
-  --grad: linear-gradient(115deg, #a674ff, #3f8bff);
+  --grad: linear-gradient(115deg, #4ade80, #16a34a);
   --r: 10px;
   --maxw: 1440px;
   --ease: cubic-bezier(0.19, 1, 0.22, 1);
@@ -101,8 +101,8 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
   transition: transform 0.2s var(--ease), box-shadow 0.28s var(--ease), background 0.2s, border-color 0.2s;
   white-space: nowrap;
 }
-.btn-primary { background: var(--grad); color: #fff; box-shadow: 0 6px 26px rgba(120, 90, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
-.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgba(120, 90, 255, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.btn-primary { background: var(--grad); color: #fff; box-shadow: 0 6px 26px rgba(52, 211, 153, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgba(52, 211, 153, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
 .btn-primary:active { transform: translateY(0); }
 .btn-ghost { background: transparent; color: var(--text); border-color: var(--line-2); }
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.05); transform: translateY(-2px); }
@@ -127,7 +127,7 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 .hero { position: relative; padding: clamp(52px, 8vw, 104px) 0 0; overflow: hidden; }
 /* ASCII field rendered behind the hero content — subtle, colorful, cursor-lit */
 .hero-ascii { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
-.hero-glow { position: absolute; top: -8%; left: 50%; transform: translateX(-50%); width: 66vw; height: 50vw; max-width: 760px; max-height: 580px; background: radial-gradient(circle, rgba(120, 100, 255, 0.28), transparent 64%); pointer-events: none; z-index: 0; }
+.hero-glow { position: absolute; top: -8%; left: 50%; transform: translateX(-50%); width: 66vw; height: 50vw; max-width: 760px; max-height: 580px; background: radial-gradient(circle, rgba(52, 211, 153, 0.28), transparent 64%); pointer-events: none; z-index: 0; }
 /* centered hero: value prop first, product screenshot below */
 .hero-inner { position: relative; z-index: 1; max-width: var(--maxw); margin: 0 auto; padding: clamp(20px, 5vw, 64px) 26px 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
 .hero-copy { display: flex; flex-direction: column; align-items: center; max-width: 900px; }
@@ -171,7 +171,7 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 /* ── Demo ── */
 .demo-head { max-width: 720px; }
 .demo-head .sub { font-size: 1.08rem; }
-.tag-code { color: #cbd5ff; background: rgba(123, 108, 255, 0.13); padding: 2px 7px; border-radius: 6px; }
+.tag-code { color: #cbd5ff; background: rgba(52, 211, 153, 0.13); padding: 2px 7px; border-radius: 6px; }
 .demo-video { margin-top: clamp(34px, 4vw, 48px); border-radius: var(--r); overflow: hidden; border: 1px solid var(--line-2); box-shadow: 0 30px 76px rgba(0, 0, 0, 0.52); }
 .demo-video video { display: block; width: 100%; height: auto; background: #000; }
 .demo-video figcaption { font-size: 0.85rem; color: var(--text-mute); padding: 14px 18px; background: var(--surface); border-top: 1px solid var(--line); }
@@ -185,7 +185,7 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 .fstep .idx { font-family: var(--num); font-size: 3rem; color: var(--gold); line-height: 1; margin-bottom: 14px; opacity: 0.34; letter-spacing: 0.02em; }
 .fstep h3 { margin-bottom: 10px; font-size: 1.16rem; }
 .fstep p { color: var(--text-dim); font-size: 0.98rem; max-width: 34ch; }
-.fstep code { color: #cbd5ff; background: rgba(123, 108, 255, 0.13); padding: 2px 6px; border-radius: 5px; }
+.fstep code { color: #cbd5ff; background: rgba(52, 211, 153, 0.13); padding: 2px 6px; border-radius: 5px; }
 
 /* ── How it works ── */
 .how-grid { display: grid; grid-template-columns: 1fr 1.05fr; gap: 56px; align-items: center; }
@@ -212,10 +212,10 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 .cell:hover { transform: translateY(-3px); border-color: var(--line-2); }
 .cell h3 { margin-bottom: 10px; }
 .cell p { color: var(--text-dim); font-size: 0.95rem; }
-.cell code { color: #cbd5ff; background: rgba(123, 108, 255, 0.12); padding: 2px 6px; border-radius: 5px; }
+.cell code { color: #cbd5ff; background: rgba(52, 211, 153, 0.12); padding: 2px 6px; border-radius: 5px; }
 .cell-wide { grid-column: span 2; }
 .cell-tall { grid-row: span 2; }
-.cell.accent { background: radial-gradient(130% 130% at 100% 0%, rgba(79, 140, 255, 0.13), transparent 56%), var(--surface); border-color: rgba(123, 108, 255, 0.26); }
+.cell.accent { background: radial-gradient(130% 130% at 100% 0%, rgba(34, 197, 94, 0.13), transparent 56%), var(--surface); border-color: rgba(52, 211, 153, 0.26); }
 .cell.dark { background: #0c0c12; }
 .cap-demo { font-family: var(--display); font-size: 2.7rem; letter-spacing: 0; margin-top: 24px; line-height: 1; text-transform: uppercase; }
 .stat { font-family: var(--num); font-size: 4rem; line-height: 0.9; color: var(--gold); letter-spacing: 0.01em; }
@@ -295,12 +295,12 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 
 .fx { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
 
-/* 1. Aurora: slow-drifting brand wash (purple, blue, a touch of gold) */
+/* 1. Aurora: slow-drifting brand wash (green, a touch of gold) */
 .fx-aurora {
   position: absolute; inset: -25%;
   background:
-    radial-gradient(40% 44% at 78% 10%, rgba(90, 130, 255, 0.30), transparent 68%),
-    radial-gradient(36% 40% at 14% 2%, rgba(150, 100, 255, 0.30), transparent 68%),
+    radial-gradient(40% 44% at 78% 10%, rgba(34, 197, 94, 0.30), transparent 68%),
+    radial-gradient(36% 40% at 14% 2%, rgba(52, 211, 153, 0.30), transparent 68%),
     radial-gradient(32% 36% at 60% 90%, rgba(255, 200, 70, 0.12), transparent 70%);
   filter: blur(22px);
   animation: drift 26s ease-in-out infinite alternate;
@@ -324,7 +324,7 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 /* 3. Cursor spotlight - follows the pointer (vars set in main.js via rAF) */
 .fx-spot {
   position: absolute; inset: 0;
-  background: radial-gradient(460px circle at var(--mx, 50%) var(--my, -20%), rgba(123, 108, 255, 0.09), transparent 62%);
+  background: radial-gradient(460px circle at var(--mx, 50%) var(--my, -20%), rgba(52, 211, 153, 0.09), transparent 62%);
   transition: opacity 0.4s ease;
 }
 
@@ -367,7 +367,7 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 .cell::before {
   content: ""; position: absolute; inset: 0; border-radius: inherit;
   padding: 1px; opacity: 0; transition: opacity 0.3s ease;
-  background: radial-gradient(240px circle at var(--cx, 50%) var(--cy, 50%), rgba(140, 130, 255, 0.7), transparent 60%);
+  background: radial-gradient(240px circle at var(--cx, 50%) var(--cy, 50%), rgba(52, 211, 153, 0.7), transparent 60%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor; mask-composite: exclude;
 }
@@ -475,9 +475,9 @@ h3 { font-family: var(--sans); font-size: 1.08rem; font-weight: 650; letter-spac
 /* Tinted glass variants keep their hue but gain the frost */
 .cell.accent {
   background:
-    radial-gradient(130% 130% at 100% 0%, rgba(79, 140, 255, 0.20), transparent 56%),
+    radial-gradient(130% 130% at 100% 0%, rgba(34, 197, 94, 0.20), transparent 56%),
     var(--glass-2);
-  border-color: rgba(140, 130, 255, 0.34);
+  border-color: rgba(52, 211, 153, 0.34);
 }
 .cell.dark { background: rgba(6, 6, 14, 0.40); }
 

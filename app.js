@@ -9,8 +9,8 @@
 /* ── Constants ─────────────────────────────────────────────────────────── */
 const TRACKS = [
   { id: "V3", kind: "video", h: 44, color: "#ffd166" },
-  { id: "V2", kind: "video", h: 58, color: "#7b6cff" },
-  { id: "V1", kind: "video", h: 58, color: "#4f8cff" },
+  { id: "V2", kind: "video", h: 58, color: "#34d399" },
+  { id: "V1", kind: "video", h: 58, color: "#22c55e" },
   { id: "A1", kind: "audio", h: 42, color: "#7ec249" },
   { id: "A2", kind: "audio", h: 42, color: "#5a9e3a" },
   { id: "A3", kind: "audio", h: 42, color: "#4a8a2f" },
@@ -3331,7 +3331,7 @@ function drawKfGraph(cv, c, key) {
   if (y0 > 4 && y0 < H - 4) { g.moveTo(3, y0); g.lineTo(W - 3, y0); g.stroke(); }
 
   // interpolated curve (only the zoomed window)
-  g.strokeStyle = "#7b6cff";
+  g.strokeStyle = "#34d399";
   g.lineWidth = 1.5;
   g.beginPath();
   const steps = Math.max(24, Math.floor(W));
@@ -4395,7 +4395,7 @@ function drawSelectionOverlay(W, H, t) {
   const hd = overlayHandles(b, W, H), hs = hd.hs;
   ctx2d.setTransform(1, 0, 0, 1, 0, 0);
   ctx2d.save();
-  ctx2d.lineWidth = lw; ctx2d.strokeStyle = "#4f8cff";
+  ctx2d.lineWidth = lw; ctx2d.strokeStyle = "#22c55e";
   ctx2d.save();
   ctx2d.translate(b.cx, b.cy); ctx2d.rotate(b.rot);
   ctx2d.setLineDash([lw * 4, lw * 3]);
