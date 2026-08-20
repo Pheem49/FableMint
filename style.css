@@ -1342,13 +1342,48 @@ input[type=range] {
 }
 
 .track-headers {
-  width: 58px;
+  width: 92px;
   flex: none;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid var(--border);
-  padding-top: 26px;
   background: var(--panel);
   z-index: 2;
   overflow: hidden;
+}
+
+/* Sits in the corner above the track list, level with the ruler (both 26px) —
+   a real element now (not the old padding-top spacer) so it can hold the
+   add-track buttons without disturbing the track rows' scroll-sync below it. */
+.track-corner {
+  flex: none;
+  height: 26px;
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.track-corner-btn {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.track-corner-btn:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--panel-2);
+}
+
+.track-corner-btn:disabled {
+  opacity: .35;
+  cursor: not-allowed;
+}
+
+.track-corner-btn + .track-corner-btn {
+  border-left: 1px solid var(--border);
 }
 
 .track-head {
@@ -1379,6 +1414,51 @@ input[type=range] {
   cursor: pointer;
   border-radius: 4px;
   color: inherit;
+}
+
+.track-twist {
+  flex: none;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.track-twist:hover {
+  color: var(--text);
+}
+
+.track-twist[aria-expanded="true"] {
+  color: var(--accent);
+}
+
+.track-id {
+  flex: 1;
+}
+
+.track-delete {
+  flex: none;
+  width: 14px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.track-delete:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.track-delete:disabled {
+  opacity: .25;
+  cursor: not-allowed;
 }
 
 .track-toggle:hover {
@@ -1535,6 +1615,19 @@ input[type=range] {
   text-overflow: ellipsis;
   pointer-events: none;
   z-index: 3;
+}
+
+/* An individually-expanded track wraps the label instead of truncating it to
+   one line, so a title clip's full text (or a longer clip name) is readable.
+   display:block (not the base rule's flex) sidesteps flex's anonymous-item
+   min-width/sizing quirks with pre-wrapped text, so wrapping is unambiguous. */
+.clip.track-expanded .clip-label {
+  display: block;
+  padding-top: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+  text-overflow: clip;
 }
 
 /* Keyframe diamonds on the clip — same size/color as ruler beat markers */

@@ -26,7 +26,14 @@ const TRACK_SIZE_PRESETS = {
 // Generous cap on how many audio tracks can be auto-added for a multi-channel
 // source (e.g. 7.1 surround = 8 channels) — see ensureAudioTrackCount().
 const MAX_AUDIO_TRACKS = 16;
+// Cap for manually-added video tracks (the "+ Track" button) — see ensureVideoTrackCount().
+const MAX_VIDEO_TRACKS = 8;
+// Per-track expand/collapse (independent of the S/M/L density preset) — a
+// tall row for one track, e.g. to read a title's full text or see a bigger
+// waveform, without changing everything else's height.
+const TRACK_EXPANDED_H = { video: 80, audio: 80 };
 const TRACK_SIZE_KEY = "fablecut-track-size";
+const TRACK_EXPANDED_KEY = "fablecut-track-expanded";
 const PANEL_HIDDEN_KEY = { bin: "fablecut-bin-hidden", inspector: "fablecut-inspector-hidden" };
 const LAST_TRANS_KEY = { in: "fablecut-last-trans-in", out: "fablecut-last-trans-out" };
 const DEFAULT_LAST_TRANS = { type: "fade", duration: 1 };
@@ -141,6 +148,26 @@ const TRACK_IDS = new Set(TRACKS.map((t) => t.id));
 // Starts as the 4 built-in tracks; ensureAudioTrackCount() grows both this and
 // TRACKS/TRACK_IDS at runtime for sources with more channels (5.1, 7.1, …).
 const AUDIO_TRACK_IDS = TRACKS.filter((t) => t.kind === "audio").map((t) => t.id);
+/* Add V4, V5, … until there are `need` video tracks (capped at MAX_VIDEO_TRACKS).
+   Each new track is unshifted to the FRONT of TRACKS, becoming the new topmost/
+   frontmost layer — visibleClipsAt() draws video tracks bottom-up by reversing
+   this array, so this needs no change anywhere else to composite correctly.
+   Returns how many were added. */
+function ensureVideoTrackCount(need) {
+  need = Math.min(need, MAX_VIDEO_TRACKS);
+  const palette = ["#ffd166", "#60a5fa", "#38bdf8", "#22d3ee", "#a78bfa"];
+  const newIds = [];
+  while (TRACKS.filter((t) => t.kind === "video").length < need) {
+    const n = TRACKS.filter((t) => t.kind === "video").length + 1;
+    const id = "V" + n;
+    const preset = TRACK_SIZE_PRESETS[state.trackSize] || TRACK_SIZE_PRESETS.l;
+    TRACKS.unshift({ id, kind: "video", h: preset.h.V1 || 58, color: palette[(n - 1) % palette.length] });
+    TRACK_IDS.add(id);
+    newIds.push(id);
+  }
+  if (newIds.length) buildTrackDOM();
+  return newIds.length;
+}
 /* Add A5, A6, … until there are `need` audio tracks (capped at
    MAX_AUDIO_TRACKS), so multi-channel sources beyond stereo/quad (5.1, 7.1…)
    each get their own linked audio track. Returns how many were added. */
@@ -246,6 +273,7 @@ const state = {
   selId: null,           // primary selection (drives the inspector)
   selIds: new Set(),     // full multi-selection (includes selId)
   trackSize: "l",        // s | m | l — timeline track density preset
+  trackExpanded: new Set(), // track ids individually expanded (bigger thumbs/waveform/full text)
   connected: false, exporting: false,
   rendering: false,      // fast (server/ffmpeg) export in progress
   guides: false,         // safe-area overlay on the monitor
@@ -355,6 +383,11 @@ const getMedia = (id) => project.media.find((m) => m.id === id);
 const getClip = (id) => project.clips.find((c) => c.id === id);
 const clipEnd = (c) => c.start + c.duration;
 const trackOf = (c) => TRACKS.find((t) => t.id === c.track);
+/** Effective row height for a track: its expanded height when individually
+ * expanded, else the current S/M/L density's height. */
+function trackHeight(t) {
+  return state.trackExpanded.has(t.id) ? TRACK_EXPANDED_H[t.kind] : t.h;
+}
 /** Last timeline second occupied by a clip on a known track (ignores orphan refs). */
 function projDur() {
   let mx = 0;
@@ -626,14 +659,21 @@ function applyProject(data) {
       if (Array.isArray(arr)) arr.sort((a, b) => a.t - b.t);
     if (c.kind === "text") ensureFont(c.props.font);
   }
-  // TRACKS isn't persisted — any extra audio lanes (A5+, from a multi-channel
-  // source) only exist as clip.track references on disk. Recreate them so
-  // those clips don't silently vanish from the timeline on reload.
+  // TRACKS isn't persisted — extra lanes beyond the built-in V1-V3/A1-A4 only
+  // exist as an explicit videoTracks/audioTracks count, or (for older saves/
+  // agents that skip that field) as clip.track references on disk. Recreate
+  // them from whichever implies more, so clips never silently vanish.
+  let maxVideoTrack = TRACKS.filter((t) => t.kind === "video").length;
   let maxAudioTrack = AUDIO_TRACK_IDS.length;
   for (const c of project.clips) {
+    const vm = /^V(\d+)$/.exec(c.track || "");
+    if (vm) maxVideoTrack = Math.max(maxVideoTrack, +vm[1]);
     const am = /^A(\d+)$/.exec(c.track || "");
     if (am) maxAudioTrack = Math.max(maxAudioTrack, +am[1]);
   }
+  if (data.videoTracks > maxVideoTrack) maxVideoTrack = data.videoTracks;
+  if (data.audioTracks > maxAudioTrack) maxAudioTrack = data.audioTracks;
+  if (maxVideoTrack > TRACKS.filter((t) => t.kind === "video").length) ensureVideoTrackCount(maxVideoTrack);
   if (maxAudioTrack > AUDIO_TRACK_IDS.length) ensureAudioTrackCount(maxAudioTrack);
   // AV links aren't always on disk (older saves / agents) — rebuild from matching timing.
   relinkClips();
@@ -675,6 +715,8 @@ function projectJSON() {
   const { name, width, height, fps, background, revision, folders, media, clips, markers, inPoint, outPoint, disabledTracks } = project;
   return {
     name, width, height, fps, background, revision,
+    videoTracks: TRACKS.filter((t) => t.kind === "video").length,
+    audioTracks: TRACKS.filter((t) => t.kind === "audio").length,
     folders: (folders || []).map(({ id, name, parentId, open }) =>
       ({ id, name, parentId: parentId || null, open: open !== false })),
     media: media.filter((m) => !m.transient).map(({ id, name, kind, src, duration, width, height, folderId }) =>
@@ -2002,35 +2044,127 @@ function trackToggleIcon(kind) {
     `<path class="track-ico-off" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M2.2 2.2l11.6 11.6"/>` +
     `</svg>`;
 }
-function buildTrackDOM() {
-  els.trackHeaders.innerHTML = "";
-  els.tracks.innerHTML = "";
-  const inner = document.createElement("div");
-  inner.id = "trackHeadInner";
-  els.trackHeaders.appendChild(inner);
-  for (const t of TRACKS) {
-    const on = isTrackEnabled(t.id);
-    const h = document.createElement("div");
-    h.className = "track-head" + (on ? "" : " disabled");
-    h.dataset.track = t.id;
-    h.style.height = t.h + "px";
-    h.innerHTML =
-      `<button type="button" class="track-toggle" aria-pressed="${on}" ` +
-      `title="${on ? "Disable track" : "Enable track"}" style="color:${t.color}">` +
-      `${trackToggleIcon(t.kind)}</button>` +
-      `<span class="track-id">${t.id}</span>`;
-    h.querySelector(".track-toggle").addEventListener("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      toggleTrackEnabled(t.id);
-    });
-    inner.appendChild(h);
-    const row = document.createElement("div");
-    row.className = "track" + (on ? "" : " disabled");
-    row.dataset.track = t.id;
-    row.style.height = t.h + "px";
-    els.tracks.appendChild(row);
+/* A track can only be removed one at a time from the outside in — the
+ * highest-numbered track of its kind, and only once it's empty — so deleting
+ * never has to renumber the tracks below it. Built-in tracks (V1-V3, A1-A4)
+ * never go away. Returns {ok:true} or {ok:false, reason} for the button's tooltip. */
+function canDeleteTrack(t) {
+  const base = t.kind === "video" ? 3 : 4;
+  const sameKind = TRACKS.filter((x) => x.kind === t.kind);
+  if (sameKind.length <= base) return { ok: false, reason: `Can't go below the default ${base} ${t.kind} tracks` };
+  const num = parseInt(t.id.slice(1), 10);
+  const maxNum = Math.max(...sameKind.map((x) => parseInt(x.id.slice(1), 10)));
+  if (num !== maxNum) return { ok: false, reason: `Delete ${t.kind === "video" ? "V" : "A"}${maxNum} first` };
+  if (project.clips.some((c) => c.track === t.id)) return { ok: false, reason: "Track has clips — move or delete them first" };
+  return { ok: true };
+}
+function deleteTrack(id) {
+  const t = TRACKS.find((x) => x.id === id);
+  if (!t) return;
+  const check = canDeleteTrack(t);
+  if (!check.ok) { toast(check.reason); return; }
+  TRACKS.splice(TRACKS.indexOf(t), 1);
+  TRACK_IDS.delete(id);
+  if (t.kind === "audio") {
+    const i = AUDIO_TRACK_IDS.indexOf(id);
+    if (i >= 0) AUDIO_TRACK_IDS.splice(i, 1);
+    const bus = runtime.audio?.trackBus[id];
+    if (bus) {
+      try { bus.disconnect(); } catch { }
+      delete runtime.audio.trackBus[id];
+      const j = runtime.audio.audioTrackIds.indexOf(id);
+      if (j >= 0) runtime.audio.audioTrackIds.splice(j, 1);
+    }
   }
+  state.trackExpanded.delete(id);
+  state.disabledTracks.delete(id);
+  project.disabledTracks = [...state.disabledTracks].sort();
+  buildTrackDOM();
+  rebuildClips();
+  scheduleSave();
+}
+function renderTrackHeaderRow(t, inner) {
+  const on = isTrackEnabled(t.id);
+  const expanded = state.trackExpanded.has(t.id);
+  const th = trackHeight(t);
+  const del = canDeleteTrack(t);
+  const h = document.createElement("div");
+  h.className = "track-head" + (on ? "" : " disabled");
+  h.dataset.track = t.id;
+  h.style.height = th + "px";
+  h.innerHTML =
+    `<button type="button" class="track-toggle" aria-pressed="${on}" ` +
+    `title="${on ? "Disable track" : "Enable track"}" style="color:${t.color}">` +
+    `${trackToggleIcon(t.kind)}</button>` +
+    `<button type="button" class="track-twist" aria-expanded="${expanded}" ` +
+    `title="${expanded ? "Collapse" : "Expand"} — see the full waveform/text/thumbnails">` +
+    `${expanded ? "▼" : "▶"}</button>` +
+    `<span class="track-id">${t.id}</span>` +
+    `<button type="button" class="track-delete" ${del.ok ? "" : "disabled"} ` +
+    `title="${del.ok ? "Delete this track" : del.reason}">×</button>`;
+  h.querySelector(".track-toggle").addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    toggleTrackEnabled(t.id);
+  });
+  h.querySelector(".track-twist").addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    toggleTrackExpanded(t.id);
+  });
+  h.querySelector(".track-delete").addEventListener("click", (ev) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    deleteTrack(t.id);
+  });
+  inner.appendChild(h);
+  const row = document.createElement("div");
+  row.className = "track" + (on ? "" : " disabled");
+  row.dataset.track = t.id;
+  row.style.height = th + "px";
+  els.tracks.appendChild(row);
+}
+/* "+ V/A Track" buttons live in the timeline toolbar (always visible), not in
+   this scrolling header column: the column is `overflow:hidden` and only
+   ever "scrolls" via a transform kept in sync with .tracks' real scrollbar
+   (see the scroll listener below) — content here beyond what .tracks is tall
+   enough to scroll to is simply unreachable, so a trailing footer row here
+   would end up permanently invisible. Just keep the toolbar buttons' enabled
+   state in sync with the current counts. */
+function syncAddTrackButtons() {
+  const vCount = TRACKS.filter((t) => t.kind === "video").length;
+  const aCount = TRACKS.filter((t) => t.kind === "audio").length;
+  const vBtn = $("btnAddVideoTrack"), aBtn = $("btnAddAudioTrack");
+  if (vBtn) {
+    vBtn.disabled = vCount >= MAX_VIDEO_TRACKS;
+    vBtn.title = vBtn.disabled ? `Already at the ${MAX_VIDEO_TRACKS}-track limit` : "Add a video track (becomes the new topmost layer)";
+  }
+  if (aBtn) {
+    aBtn.disabled = aCount >= MAX_AUDIO_TRACKS;
+    aBtn.title = aBtn.disabled ? `Already at the ${MAX_AUDIO_TRACKS}-track limit` : "Add an audio track";
+  }
+}
+function buildTrackDOM() {
+  // Only rebuild the track rows themselves — .track-corner (the +V/+A buttons)
+  // is static markup living in the same #trackHeaders container and must survive.
+  let inner = $("trackHeadInner");
+  if (!inner) {
+    inner = document.createElement("div");
+    inner.id = "trackHeadInner";
+    els.trackHeaders.appendChild(inner);
+  }
+  inner.innerHTML = "";
+  els.tracks.innerHTML = "";
+  for (const t of TRACKS) renderTrackHeaderRow(t, inner);
+  syncAddTrackButtons();
+}
+function toggleTrackExpanded(id) {
+  if (state.trackExpanded.has(id)) state.trackExpanded.delete(id);
+  else state.trackExpanded.add(id);
+  try { localStorage.setItem(TRACK_EXPANDED_KEY, JSON.stringify([...state.trackExpanded])); } catch { }
+  state.dirtyTimeline = true;
+  buildTrackDOM();
+  rebuildClips();
 }
 /* keep track headers vertically aligned with the (scrollable) track rows */
 els.timelineScroll.addEventListener("scroll", () => {
@@ -2116,10 +2250,13 @@ function rebuildClips() {
   for (const row of els.tracks.children) row.innerHTML = "";
   for (const c of project.clips) {
     const tr = trackOf(c); if (!tr) continue;
+    const th = trackHeight(tr);
+    const expanded = state.trackExpanded.has(c.track);
     const row = els.tracks.querySelector(`[data-track="${c.track}"]`);
     const div = document.createElement("div");
     div.className = `clip c-${c.kind}` +
-      (state.selIds.has(c.id) ? " selected" : "") + (c.id === state.selId ? " primary" : "");
+      (state.selIds.has(c.id) ? " selected" : "") + (c.id === state.selId ? " primary" : "") +
+      (expanded ? " track-expanded" : "");
     div.dataset.id = c.id;
     div.style.left = c.start * state.pps + "px";
     div.style.width = Math.max(8, c.duration * state.pps) + "px";
@@ -2135,7 +2272,9 @@ function rebuildClips() {
     const chN = c.props?.audioChannel;
     const chTag = chN === 0 ? "L · " : chN === 1 ? "R · "
                 : Number.isInteger(chN) ? `Ch${chN + 1} · ` : "";
-    const label = c.kind === "text" ? "T · " + (c.props.text || "").split("\n")[0]
+    // A wide/expanded track shows the clip's full text instead of just its first line.
+    const textContent = expanded ? (c.props.text || "") : (c.props.text || "").split("\n")[0];
+    const label = c.kind === "text" ? "T · " + textContent
       : c.kind === "adjust" ? "FX · " + (c.name || "")
       : c.kind === "audio" ? chTag + (c.name || "")
       : (c.name || "");
@@ -2143,16 +2282,30 @@ function rebuildClips() {
       <div class="clip-label">${badge}${escapeHtml(label)}</div>`;
     body += clipKeyframesHtml(c);
     let inner = `<div class="clip-body">${body}</div>`;
-    inner += transitionMarksHtml(c, tr.h);
+    inner += transitionMarksHtml(c, th);
     inner += `<div class="handle l"></div><div class="handle r"></div>`;
     div.innerHTML = inner;
     if (hasWave) div.classList.add("has-wave");
     row.appendChild(div);
-    if (hasWave) drawClipWave(div.querySelector(".wave"), c, tr.h);
+    if (hasWave) drawClipWave(div.querySelector(".wave"), c, th);
   }
   paintAudioOverlaps();
+  syncTrackDeleteButtons();
   state.dirtyTimeline = false;
   updateWorkArea();
+}
+/* Each delete button's enabled state depends on project.clips (is the track
+   empty?), which changes far more often than the track list itself — refresh
+   it whenever clips do (rebuildClips), not just when buildTrackDOM rebuilds
+   the header rows from scratch. */
+function syncTrackDeleteButtons() {
+  for (const t of TRACKS) {
+    const btn = els.trackHeaders.querySelector(`.track-head[data-track="${t.id}"] .track-delete`);
+    if (!btn) continue;
+    const del = canDeleteTrack(t);
+    btn.disabled = !del.ok;
+    btn.title = del.ok ? "Delete this track" : del.reason;
+  }
 }
 /* Hatched bands where two+ audio clips share a track (CSS draw, O(n²) per track). */
 function paintAudioOverlaps() {
@@ -5574,6 +5727,16 @@ els.btnSnap.addEventListener("click", () => {
 if (els.btnAudioHold) {
   els.btnAudioHold.addEventListener("click", () => setAudioHold(!state.audioHold));
 }
+$("btnAddVideoTrack")?.addEventListener("click", () => {
+  ensureVideoTrackCount(TRACKS.filter((t) => t.kind === "video").length + 1);
+  scheduleSave();
+  rebuildClips();
+});
+$("btnAddAudioTrack")?.addEventListener("click", () => {
+  ensureAudioTrackCount(TRACKS.filter((t) => t.kind === "audio").length + 1);
+  scheduleSave();
+  rebuildClips();
+});
 $("btnLayoutReset").addEventListener("click", restoreDefaultLayout);
 els.projectName.addEventListener("dblclick", startProjectRename);
 $("trackSizeGroup").addEventListener("click", (e) => {
@@ -6008,6 +6171,12 @@ function restoreDefaultLayout() {
   resetTimelineHeight();
   setPanelHidden("bin", false);
   setPanelHidden("inspector", false);
+  if (state.trackExpanded.size) {
+    state.trackExpanded.clear();
+    try { localStorage.removeItem(TRACK_EXPANDED_KEY); } catch { }
+    buildTrackDOM();
+    rebuildClips();
+  }
 }
 function clampTimelineHeight() {
   const cur = $("timelinePanel")?.getBoundingClientRect().height;
@@ -6021,6 +6190,10 @@ function initPanelSplit() {
   if (TRACK_SIZE_PRESETS[savedSize]) state.trackSize = savedSize;
   applyTrackHeights();
   syncTrackSizeButtons();
+  try {
+    const savedExpanded = JSON.parse(localStorage.getItem(TRACK_EXPANDED_KEY) || "[]");
+    if (Array.isArray(savedExpanded)) state.trackExpanded = new Set(savedExpanded);
+  } catch { }
 
   const saved = parseFloat(localStorage.getItem(TL_H_KEY));
   if (saved > 0) setTimelineHeight(saved);

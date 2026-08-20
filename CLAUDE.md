@@ -190,6 +190,15 @@ Examples in `library/svg/`: `sparkles.svg` (loop), `lower-third.svg`,
   ],
   "disabledTracks": [ "A2" ],
   // ^ optional — track ids (V4 V3 V2 V1 A1 A2 A3) omitted from preview/export when listed
+  "videoTracks": 3, "audioTracks": 4,
+  // ^ optional — default 3/4 (V1-V3, A1-A4). Growing it (via this field, the
+  // UI's "+V"/"+A" buttons, or just putting a clip on a higher track, e.g.
+  // track:"V4"/"A5") is agent/API-drivable and capped at 8 video / 16 audio.
+  // Shrinking is UI-only (the × on a track header) and one at a time from the
+  // outside in — only the highest-numbered, currently-empty track of its
+  // kind, never below the 3/4 default — so it never has to renumber the
+  // tracks below it. A new video track becomes the new
+  // topmost/frontmost layer (drawn last).
   "media": [
     { "id": "m_abc", "name": "intro.mp4", "kind": "video",  // video|audio|image|svg
       "src": "/media/intro.mp4",             // path under ./media or ./library
@@ -201,7 +210,7 @@ Examples in `library/svg/`: `sparkles.svg` (loop), `lower-third.svg`,
       "id": "c_xyz",             // unique string
       "mediaId": "m_abc",        // null for kind:"text" and kind:"adjust"
       "kind": "video",           // video | audio | image | svg | text | adjust
-      "track": "V1",             // V3 V2 V1 (top→bottom video) | A1 A2 A3 A4 (audio)
+      "track": "V1",             // V3 V2 V1 (top→bottom video) | A1 A2 A3 A4 (audio) — more via videoTracks/audioTracks
       "start": 0,                // timeline position, seconds
       "in": 2.5,                 // offset into source media, seconds (0 for image/svg/text)
       "duration": 5,             // clip length on timeline, seconds
