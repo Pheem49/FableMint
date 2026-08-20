@@ -1,13 +1,13 @@
 {
-  "name": "fablecut",
+  "name": "fablemint",
   "owner": {
-    "name": "Ronak Parmar",
-    "url": "https://github.com/ronak-create"
+    "name": "Pheem49",
+    "url": "https://github.com/Pheem49"
   },
-  "description": "FableCut — a browser video editor that AI agents can drive.",
+  "description": "FableMint — a browser video editor that AI agents can drive.",
   "plugins": [
     {
-      "name": "fablecut",
+      "name": "fablemint",
       "source": "./",
       "category": "media",
       "tags": ["video", "video-editing", "captions", "ffmpeg", "mcp"]

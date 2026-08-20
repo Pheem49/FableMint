@@ -1,14 +1,14 @@
 {
-  "name": "fablecut",
-  "displayName": "FableCut",
+  "name": "fablemint",
+  "displayName": "FableMint",
   "version": "1.6.0",
   "description": "A browser video editor you can drive from Claude Code. The timeline is one JSON document — patch it and the open editor hot-reloads in ~150 ms. Cuts, keyframes, transitions, kinetic captions, chroma key, speed ramps, and MP4 export via ffmpeg.",
   "author": {
-    "name": "Ronak Parmar",
-    "url": "https://github.com/ronak-create"
+    "name": "Pheem49",
+    "url": "https://github.com/Pheem49"
   },
-  "homepage": "https://ronak-create.github.io/FableCut/",
-  "repository": "https://github.com/ronak-create/FableCut",
+  "homepage": "https://github.com/Pheem49/FableMint",
+  "repository": "https://github.com/Pheem49/FableMint",
   "license": "MIT",
   "keywords": [
     "video-editor",

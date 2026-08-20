@@ -1,25 +1,15 @@
 <div align="center">
 
 <pre align="center">
-███████╗ █████╗ ██████╗ ██╗     ███████╗ ██████╗██╗   ██╗████████╗
-██╔════╝██╔══██╗██╔══██╗██║     ██╔════╝██╔════╝██║   ██║╚══██╔══╝
-█████╗  ███████║██████╔╝██║     █████╗  ██║     ██║   ██║   ██║   
-██╔══╝  ██╔══██║██╔══██╗██║     ██╔══╝  ██║     ██║   ██║   ██║   
-██║     ██║  ██║██████╔╝███████╗███████╗╚██████╗╚██████╔╝   ██║   
-╚═╝     ╚═╝  ╚═╝╚═════╝ ╚══════╝╚══════╝ ╚═════╝ ╚═════╝    ╚═╝   
+███████╗ █████╗ ██████╗ ██╗     ███████╗███╗   ███╗██╗███╗   ██╗████████╗
+██╔════╝██╔══██╗██╔══██╗██║     ██╔════╝████╗ ████║██║████╗  ██║╚══██╔══╝
+█████╗  ███████║██████╔╝██║     █████╗  ██╔████╔██║██║██╔██╗ ██║   ██║   
+██╔══╝  ██╔══██║██╔══██╗██║     ██╔══╝  ██║╚██╔╝██║██║██║╚██╗██║   ██║   
+██║     ██║  ██║██████╔╝███████╗███████╗██║ ╚═╝ ██║██║██║ ╚████║   ██║   
+╚═╝     ╚═╝  ╚═╝╚═════╝ ╚══════╝╚══════╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝   
 </pre>
 
 **A browser video editor that AI agents can drive.**
-
-<a href="https://trendshift.io/repositories/77702?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-77702" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/77702/daily?language=JavaScript" alt="ronak-create%2FFableCut | Trendshift" width="250" height="55"/></a>
-
-[![Hacker News — front page](https://img.shields.io/badge/Hacker%20News-front%20page-ff6600?logo=ycombinator&logoColor=white)](https://news.ycombinator.com/item?id=48845422)
-[![DEV — Top 7 of the week](https://img.shields.io/badge/DEV-Top%207%20of%20the%20week-0A0A0A?logo=devdotto&logoColor=white)](https://dev.to/devteam/top-7-featured-dev-posts-of-the-week-815)
-[![Official MCP registry](https://img.shields.io/badge/MCP%20registry-io.github.ronak--create%2Ffablecut-7b6cff?logo=modelcontextprotocol&logoColor=white)](https://registry.modelcontextprotocol.io/v0/servers?search=fablecut)
-[![Mentioned in Awesome MCP Servers](https://awesome.re/mentioned-badge.svg)](https://github.com/punkpeye/awesome-mcp-servers)
-[![Glama score](https://glama.ai/mcp/servers/ronak-create/FableCut/badges/score.svg)](https://glama.ai/mcp/servers/ronak-create/FableCut)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ronak-create/FableCut)
-[![Discord](https://img.shields.io/badge/Discord-join%20the%20community-5865F2?logo=discord&logoColor=white)](https://discord.gg/WBKScy52F)
 
 **English** · [简体中文](docs/i18n/README.zh-CN.md) · [日本語](docs/i18n/README.ja.md) · [Español](docs/i18n/README.es.md) · [Português (BR)](docs/i18n/README.pt-BR.md)
 
@@ -27,7 +17,7 @@
 
 <https://github.com/user-attachments/assets/2430b854-168b-4a9a-af2e-489e5efa7543>
 
-FableCut is a Premiere-style non-linear video editor that runs entirely in your
+FableMint is a Premiere-style non-linear video editor that runs entirely in your
 browser — and exposes its whole timeline as one JSON document. Edit it by hand,
 from the UI, or let an AI agent (Claude Code, Claude Desktop, or anything that
 speaks MCP/REST) cut your video for you while you watch the timeline update
@@ -35,11 +25,14 @@ live.
 
 Zero npm dependencies. One `node server.js`. That's it.
 
-![FableCut editor](docs/screenshot.png)
+> FableMint is a fork of [FableCut](https://github.com/ronak-create/FableCut)
+> by [Ronak Parmar](https://github.com/ronak-create), MIT licensed.
+
+![FableMint editor](docs/screenshot.png)
 
 ## Why it's interesting
 
-Most "AI video" tools hide the edit behind an API. FableCut flips that: the
+Most "AI video" tools hide the edit behind an API. FableMint flips that: the
 **project file is the interface**. `project.json` describes media, clips,
 tracks, effects, keyframes and transitions — any process that can write JSON
 can edit video, and the open browser UI hot-reloads within ~150 ms via
@@ -178,8 +171,8 @@ same time.
 ## Quick start
 
 ```bash
-git clone https://github.com/ronak-create/FableCut.git
-cd FableCut
+git clone https://github.com/Pheem49/FableMint.git
+cd FableMint
 node server.js        # → http://localhost:7777
 ```
 
@@ -200,8 +193,8 @@ you choose. Leave it unset and everything stays in the repo, exactly as before.
 ### Or install it as a Claude Code plugin
 
 ```
-/plugin marketplace add ronak-create/FableCut
-/plugin install fablecut@fablecut
+/plugin marketplace add Pheem49/FableMint
+/plugin install fablemint@fablemint
 ```
 
 That registers the MCP server for you and adds two skills — `edit-video` and
@@ -215,18 +208,13 @@ Everything an agent needs is in **[CLAUDE.md](CLAUDE.md)** — the complete
 schema, semantics and recipes. Point any capable model at that file and it can
 operate the editor end to end.
 
-> 📖 **Browsable docs:** for a conversational, auto-generated tour of the
-> codebase — architecture, the `project.json` schema, the MCP surface — see
-> **[FableCut on DeepWiki](https://deepwiki.com/ronak-create/FableCut)**. Ask it
-> questions about the repo in natural language.
-
 Three equivalent control surfaces:
 
 1. **MCP** (best for Claude Code / Claude Desktop) — register the bundled
    zero-dependency MCP server once:
 
    ```bash
-   claude mcp add -s user fablecut -- node "<path-to>/fablecut/mcp-server.js"
+   claude mcp add -s user fablemint -- node "<path-to>/FableMint/mcp-server.js"
    ```
 
    **OpenCode** can use the same stdio server from its project or global
@@ -236,9 +224,9 @@ Three equivalent control surfaces:
    {
      "$schema": "https://opencode.ai/config.json",
      "mcp": {
-       "fablecut": {
+       "fablemint": {
          "type": "local",
-         "command": ["node", "/absolute/path/to/FableCut/mcp-server.js"],
+         "command": ["node", "/absolute/path/to/FableMint/mcp-server.js"],
          "enabled": true
        }
      }
@@ -251,10 +239,10 @@ Three equivalent control surfaces:
 
    ```json
    {
-     "name": "fablecut",
+     "name": "fablemint",
      "transport": "stdio",
      "command": "node",
-     "args": ["/absolute/path/to/FableCut/mcp-server.js"]
+     "args": ["/absolute/path/to/FableMint/mcp-server.js"]
    }
    ```
 
@@ -265,11 +253,6 @@ Three equivalent control surfaces:
    Tools: `fablecut_status` (auto-starts the editor), `fablecut_docs`,
    `fablecut_get_project`, `fablecut_set_project`, `fablecut_patch_project`,
    `fablecut_import_media`, `fablecut_analyze_reference`.
-
-   FableCut is also published on the **official MCP registry** as
-   [`io.github.ronak-create/fablecut`](https://registry.modelcontextprotocol.io/v0/servers?search=fablecut)
-   — each release ships an MCPB bundle (`fablecut.mcpb`) that MCPB-capable
-   clients can install directly.
 
    The surface is **token-efficient by design**: agents patch the timeline with
    small ops (`fablecut_patch_project`) instead of round-tripping the whole
@@ -332,16 +315,15 @@ examples in [`library/svg/`](library/svg/).
   `LICENSES.md` there) and a set of self-authored SVG overlays and animated
   elements (`library/elements/`, `library/svg/`, MIT like the rest of the repo).
 - `library/sfx/` is yours to fill (gitignored): sound-effect sites typically
-  don't allow redistributing their files in a public repo, so FableCut doesn't —
+  don't allow redistributing their files in a public repo, so FableMint doesn't —
   `library/sfx/README.md` lists good free sources.
 - Export runs in the browser because the compositor *is* the browser; agents
   ask you to click Export (or render directly with ffmpeg from `media/`).
 
 ## Community
 
-Questions, ideas, showing off an edit, or want to help shape what's next? Join
-the **[FableCut Discord](https://discord.gg/WBKScy52F)**. Bugs and feature
-requests are still best filed as [GitHub issues](https://github.com/ronak-create/FableCut/issues).
+Questions, ideas, or bug reports? File a
+[GitHub issue](https://github.com/Pheem49/FableMint/issues).
 
 ## License
 
