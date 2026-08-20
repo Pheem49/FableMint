@@ -7,7 +7,8 @@
 
    Tools: fablecut_status, fablecut_docs, fablecut_get_project,
           fablecut_set_project, fablecut_patch_project, fablecut_import_media,
-          fablecut_analyze_reference
+          fablecut_analyze_reference, fablecut_auto_caption,
+          fablecut_list_checkpoints, fablecut_revert
    ═══════════════════════════════════════════════════════════════════════════ */
 "use strict";
 const fs = require("fs");
@@ -18,6 +19,7 @@ const { spawn, spawnSync } = require("child_process");
 const {
   APP_DIR, DATA_DIR, MEDIA_DIR, ANALYSIS_DIR, LIBRARY_DIR, PROJECT_FILE, ensureDirs,
 } = require("./paths");
+const { saveCheckpoint, listCheckpoints, loadCheckpoint } = require("./checkpoints");
 
 /* ROOT is where the code lives (server.js, CLAUDE.md); the user's timeline and
    media live under DATA_DIR. Identical unless FABLECUT_DATA_DIR is set. */
@@ -74,6 +76,182 @@ function ffprobeDuration(file) {
   } catch { return undefined; }
 }
 const uid = () => Math.random().toString(36).slice(2, 9);
+
+/* Applies patch ops to `proj` in place; shared by fablecut_patch_project and
+   fablecut_auto_caption so both get the same validation/merge/id rules.
+   Caller is responsible for bumping revision and writing. */
+function applyPatchOps(proj, ops) {
+  const notes = [];
+  const mergeInto = (target, set) => {
+    for (const [k, v] of Object.entries(set || {})) {
+      if (v === null) delete target[k];
+      else if (k === "props" && target.props && typeof v === "object" && !Array.isArray(v)) {
+        for (const [pk, pv] of Object.entries(v)) {
+          if (pv === null) delete target.props[pk]; else target.props[pk] = pv;
+        }
+      } else target[k] = v;
+    }
+  };
+  for (const op of ops) {
+    switch (op.op) {
+      case "addClip": {
+        const c = op.clip;
+        if (!c || !c.track || typeof c.start !== "number" || typeof c.duration !== "number")
+          throw new Error("addClip needs clip{track, start, duration}");
+        c.id = c.id || "c_" + uid();
+        if (proj.clips.some((x) => x.id === c.id)) throw new Error("addClip: duplicate clip id " + c.id);
+        if (c.kind !== "text" && c.kind !== "adjust" && !proj.media.some((m) => m.id === c.mediaId))
+          throw new Error(`addClip: unknown mediaId ${c.mediaId}`);
+        // the UI always sets `name` and the Inspector assumes it exists; default it
+        // here so patches built by hand/an agent can't produce a clip that crashes selection
+        if (!c.name) {
+          c.name = c.kind === "text" ? (c.props?.text || "Title").slice(0, 40)
+            : c.kind === "adjust" ? "Adjust"
+            : (proj.media.find((m) => m.id === c.mediaId) || {}).name || c.kind;
+        }
+        proj.clips.push(c);
+        notes.push("+" + c.id);
+        break;
+      }
+      case "updateClip": {
+        const c = proj.clips.find((x) => x.id === op.id);
+        if (!c) throw new Error("updateClip: no clip " + op.id);
+        mergeInto(c, op.set);
+        notes.push("~" + op.id);
+        break;
+      }
+      case "removeClip": {
+        const n = proj.clips.length;
+        proj.clips = proj.clips.filter((x) => x.id !== op.id);
+        if (proj.clips.length === n) throw new Error("removeClip: no clip " + op.id);
+        notes.push("-" + op.id);
+        break;
+      }
+      case "addMedia": {
+        const m = op.media;
+        if (!m || !m.src || !m.kind) throw new Error("addMedia needs media{src, kind}");
+        m.id = m.id || "m_" + uid();
+        if (proj.media.some((x) => x.id === m.id)) throw new Error("addMedia: duplicate media id " + m.id);
+        m.name = m.name || path.basename(decodeURIComponent(m.src));
+        proj.media.push(m);
+        notes.push("+" + m.id);
+        break;
+      }
+      case "removeMedia": {
+        const used = proj.clips.find((c) => c.mediaId === op.id);
+        if (used) throw new Error(`removeMedia: media ${op.id} is used by clip ${used.id}`);
+        const n = proj.media.length;
+        proj.media = proj.media.filter((x) => x.id !== op.id);
+        if (proj.media.length === n) throw new Error("removeMedia: no media " + op.id);
+        notes.push("-" + op.id);
+        break;
+      }
+      case "setProject": {
+        const allowed = ["name", "width", "height", "fps", "background", "markers", "disabledTracks"];
+        for (const [k, v] of Object.entries(op.set || {})) {
+          if (!allowed.includes(k)) throw new Error(`setProject: '${k}' not settable (allowed: ${allowed.join(", ")})`);
+          if (v === null) delete proj[k]; else proj[k] = v;
+        }
+        notes.push("~project");
+        break;
+      }
+      default:
+        throw new Error("Unknown op: " + op.op + " (addClip|updateClip|removeClip|addMedia|removeMedia|setProject)");
+    }
+  }
+  return notes;
+}
+
+/* ── Speech-to-text captioning (fablecut_auto_caption) ── */
+function resolveSrcToFile(src) {
+  if (/^\/media\//i.test(src)) return path.join(MEDIA_DIR, decodeURIComponent(src.replace(/^\/media\//i, "")));
+  if (/^\/library\//i.test(src)) return path.join(LIBRARY_DIR, decodeURIComponent(src.replace(/^\/library\//i, "")));
+  return src; // absolute path, used as-is
+}
+
+function runCmd(cmd, args) {
+  return new Promise((resolve) => {
+    const proc = spawn(cmd, args, { windowsHide: true });
+    const out = [], err = [];
+    proc.stdout.on("data", (c) => out.push(c));
+    proc.stderr.on("data", (c) => err.push(c));
+    proc.on("error", (e) => resolve({ code: -1, stdout: "", stderr: String(e) }));
+    proc.on("close", (code) => resolve({
+      code, stdout: Buffer.concat(out).toString("utf8"), stderr: Buffer.concat(err).toString("utf8"),
+    }));
+  });
+}
+
+/* Normalizes a caller-supplied word-timestamp transcript (either a bare array
+   or {words:[...]}), same tolerant shape as examples/auto-captions accepts. */
+function loadWords(transcript) {
+  const raw = Array.isArray(transcript) ? transcript : transcript?.words;
+  if (!Array.isArray(raw)) throw new Error("`transcript` must be an array of {word,start,end} or {words:[...]}");
+  const words = [];
+  for (const item of raw) {
+    if (!item || !item.word) continue;
+    const start = Number(item.start), end = Number(item.end);
+    if (!(end > start)) throw new Error(`word has invalid interval: ${JSON.stringify(item)}`);
+    words.push({ word: String(item.word).trim(), start, end });
+  }
+  return words.sort((a, b) => a.start - b.start);
+}
+
+/* Spawns faster-whisper (python3, falling back to python) to transcribe a
+   local audio/video file into word timestamps. Optional dependency, same
+   posture as ffmpeg: not bundled, clear error + install hint if missing. */
+const WHISPER_PY = `
+import sys, json
+try:
+    from faster_whisper import WhisperModel
+except ImportError:
+    print("faster-whisper not installed", file=sys.stderr)
+    sys.exit(3)
+audio, model_name = sys.argv[1], sys.argv[2]
+model = WhisperModel(model_name)
+segments, _ = model.transcribe(audio, word_timestamps=True)
+words = []
+for segment in segments:
+    for w in (segment.words or []):
+        text = w.word.strip()
+        if text:
+            words.append({"word": text, "start": w.start, "end": w.end})
+print(json.dumps({"words": words}))
+`.trim();
+async function transcribeAudio(file, model) {
+  for (const py of ["python3", "python"]) {
+    const r = await runCmd(py, ["-c", WHISPER_PY, file, model || "base"]);
+    if (r.code === -1) continue; // interpreter not found, try the next one
+    if (r.code === 3 || /faster-whisper not installed/.test(r.stderr))
+      throw new Error("Auto-transcription requires faster-whisper: pip install faster-whisper. " +
+        "Alternatively, transcribe with any STT engine yourself and pass the result as `transcript`.");
+    if (r.code !== 0) throw new Error("Transcription failed: " + (r.stderr.trim().slice(-500) || "unknown error"));
+    return loadWords(JSON.parse(r.stdout));
+  }
+  throw new Error("No python3/python interpreter found on PATH — required for auto-transcription. " +
+    "Alternatively, transcribe with any STT engine yourself and pass the result as `transcript`.");
+}
+
+/* Groups word timestamps into caption lines: a new line starts once `maxWords`
+   is reached or the line would exceed `maxSeconds`. Mirrors the grouping in
+   examples/auto-captions/auto_captions.py exactly. */
+function groupWords(words, maxWords, maxSeconds) {
+  const lines = [];
+  let current = [];
+  for (const word of words) {
+    const tooMany = current.length >= maxWords;
+    const tooLong = current.length && (word.end - current[0].start > maxSeconds);
+    if (current.length && (tooMany || tooLong)) { lines.push(current); current = []; }
+    current.push(word);
+  }
+  if (current.length) lines.push(current);
+  return lines.map((line) => ({
+    text: line.map((w) => w.word).join(" "),
+    start: line[0].start,
+    duration: Math.max(line[line.length - 1].end - line[0].start, 0.01),
+    wordRate: Math.max(...line.map((w) => w.end - w.start)),
+  }));
+}
 
 /* ── Tool definitions ── */
 const TOOLS = [
@@ -147,6 +325,40 @@ const TOOLS = [
       required: ["path"],
     },
   },
+  {
+    name: "fablecut_auto_caption",
+    description: "Generate karaoke-style caption clips from speech and patch them directly onto the timeline (no separate script/merge step). Either pass `transcript` (word-timestamp JSON from any STT engine — [{word,start,end},...] or {words:[...]}), or omit it and give `mediaId`/`path` to auto-transcribe with faster-whisper (must be installed: pip install faster-whisper; optional dependency, same posture as ffmpeg). Groups words into lines by `maxWords`/`maxSeconds`, creates one kind:'text' clip per line with textAnim:'karaoke', and appends them via the same merge-safe path as fablecut_patch_project.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        transcript: { description: "Word-timestamp transcript: an array of {word,start,end} (seconds), or {words:[...]}. Skips transcription entirely." },
+        mediaId: { type: "string", description: "Registered media id to auto-transcribe (looked up in the project's media list). Ignored if `transcript` is given." },
+        path: { type: "string", description: "Alternative to mediaId: an absolute file path or an existing '/media/…' or '/library/…' src to auto-transcribe." },
+        model: { type: "string", description: "faster-whisper model size for auto-transcription, e.g. 'tiny'|'base'|'small'|'medium'|'large-v3' (default 'base')." },
+        track: { type: "string", description: "Video track for the caption clips (default 'V3')." },
+        maxWords: { type: "number", description: "Max words per caption line (default 4)." },
+        maxSeconds: { type: "number", description: "Max seconds a caption line may span (default 1.8)." },
+        textAnim: { type: "string", description: "Caption animation (default 'karaoke'); any textAnim value from fablecut_docs {section:'props'} works." },
+        props: { type: "object", description: "Extra/override text props merged onto every generated clip, e.g. {fontSize:64, color:'#ffd166'}." },
+      },
+    },
+  },
+  {
+    name: "fablecut_list_checkpoints",
+    description: "List saved checkpoints — automatic snapshots of the project taken right before every fablecut_patch_project / fablecut_set_project / fablecut_auto_caption write, so a bad edit can always be undone. Newest first. Use with fablecut_revert.",
+    inputSchema: {
+      type: "object",
+      properties: { limit: { type: "number", description: "Max checkpoints to return (default 20)." } },
+    },
+  },
+  {
+    name: "fablecut_revert",
+    description: "Revert the project to a checkpoint (see fablecut_list_checkpoints). Omit `revision` to undo the most recently checkpointed write. The current state is itself checkpointed first, so reverting is undoable too — call fablecut_revert again to go back to what you just moved away from.",
+    inputSchema: {
+      type: "object",
+      properties: { revision: { type: "number", description: "The checkpoint's revision number to restore (from fablecut_list_checkpoints). Omit for the most recent checkpoint." } },
+    },
+  },
 ];
 
 /* ── Tool implementations ── */
@@ -192,7 +404,7 @@ async function callTool(name, args) {
       // the UI persists default-valued props on every clip; hide them so the
       // compact view only shows what actually deviates
       const DEFAULTS = {
-        x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, volume: 1, speed: 1,
+        x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, volume: 1, pan: 0, speed: 1,
         blend: "normal", fit: "contain", cropL: 0, cropR: 0, cropT: 0, cropB: 0,
         cornerRadius: 0, flipH: false, flipV: false, filterPreset: "none",
         brightness: 100, contrast: 100, saturation: 100, hue: 0, temperature: 0,
@@ -244,81 +456,12 @@ async function callTool(name, args) {
       const ops = args.ops;
       if (!Array.isArray(ops) || !ops.length) throw new Error("`ops` must be a non-empty array");
       const proj = readProject();
-      const notes = [];
-      const mergeInto = (target, set) => {
-        for (const [k, v] of Object.entries(set || {})) {
-          if (v === null) delete target[k];
-          else if (k === "props" && target.props && typeof v === "object" && !Array.isArray(v)) {
-            for (const [pk, pv] of Object.entries(v)) {
-              if (pv === null) delete target.props[pk]; else target.props[pk] = pv;
-            }
-          } else target[k] = v;
-        }
-      };
-      for (const op of ops) {
-        switch (op.op) {
-          case "addClip": {
-            const c = op.clip;
-            if (!c || !c.track || typeof c.start !== "number" || typeof c.duration !== "number")
-              throw new Error("addClip needs clip{track, start, duration}");
-            c.id = c.id || "c_" + uid();
-            if (proj.clips.some((x) => x.id === c.id)) throw new Error("addClip: duplicate clip id " + c.id);
-            if (c.kind !== "text" && c.kind !== "adjust" && !proj.media.some((m) => m.id === c.mediaId))
-              throw new Error(`addClip: unknown mediaId ${c.mediaId}`);
-            proj.clips.push(c);
-            notes.push("+" + c.id);
-            break;
-          }
-          case "updateClip": {
-            const c = proj.clips.find((x) => x.id === op.id);
-            if (!c) throw new Error("updateClip: no clip " + op.id);
-            mergeInto(c, op.set);
-            notes.push("~" + op.id);
-            break;
-          }
-          case "removeClip": {
-            const n = proj.clips.length;
-            proj.clips = proj.clips.filter((x) => x.id !== op.id);
-            if (proj.clips.length === n) throw new Error("removeClip: no clip " + op.id);
-            notes.push("-" + op.id);
-            break;
-          }
-          case "addMedia": {
-            const m = op.media;
-            if (!m || !m.src || !m.kind) throw new Error("addMedia needs media{src, kind}");
-            m.id = m.id || "m_" + uid();
-            if (proj.media.some((x) => x.id === m.id)) throw new Error("addMedia: duplicate media id " + m.id);
-            m.name = m.name || path.basename(decodeURIComponent(m.src));
-            proj.media.push(m);
-            notes.push("+" + m.id);
-            break;
-          }
-          case "removeMedia": {
-            const used = proj.clips.find((c) => c.mediaId === op.id);
-            if (used) throw new Error(`removeMedia: media ${op.id} is used by clip ${used.id}`);
-            const n = proj.media.length;
-            proj.media = proj.media.filter((x) => x.id !== op.id);
-            if (proj.media.length === n) throw new Error("removeMedia: no media " + op.id);
-            notes.push("-" + op.id);
-            break;
-          }
-          case "setProject": {
-            const allowed = ["name", "width", "height", "fps", "background", "markers", "disabledTracks"];
-            for (const [k, v] of Object.entries(op.set || {})) {
-              if (!allowed.includes(k)) throw new Error(`setProject: '${k}' not settable (allowed: ${allowed.join(", ")})`);
-              if (v === null) delete proj[k]; else proj[k] = v;
-            }
-            notes.push("~project");
-            break;
-          }
-          default:
-            throw new Error("Unknown op: " + op.op + " (addClip|updateClip|removeClip|addMedia|removeMedia|setProject)");
-        }
-      }
+      saveCheckpoint(structuredClone(proj), "fablecut_patch_project");
+      const notes = applyPatchOps(proj, ops);
       proj.revision = (proj.revision || 0) + 1;
       writeProject(proj);
       lastReadRevision = proj.revision;
-      return `Patched (revision ${proj.revision}): ${notes.join(" ")}. Now ${proj.clips.length} clip(s), ${proj.media.length} media. UI hot-reloaded.`;
+      return `Patched (revision ${proj.revision}): ${notes.join(" ")}. Now ${proj.clips.length} clip(s), ${proj.media.length} media. UI hot-reloaded. (Checkpointed — fablecut_revert undoes this.)`;
     }
     case "fablecut_set_project": {
       const doc = args.project;
@@ -347,10 +490,11 @@ async function callTool(name, args) {
           `Call fablecut_get_project, re-apply your edit on top of the latest document, then save again. ` +
           `Pass force:true only if the user explicitly wants those changes discarded.`);
       }
+      if (Array.isArray(cur.clips)) saveCheckpoint(cur, "fablecut_set_project");
       doc.revision = Math.max(curRev + 1, (doc.revision || 0));
       writeProject(doc);
       lastReadRevision = doc.revision;
-      return `Saved (revision ${doc.revision}). ${doc.clips.length} clip(s). The editor UI (if open at ${BASE}) has hot-reloaded.`;
+      return `Saved (revision ${doc.revision}). ${doc.clips.length} clip(s). The editor UI (if open at ${BASE}) has hot-reloaded. (Checkpointed — fablecut_revert undoes this.)`;
     }
     case "fablecut_analyze_reference": {
       let src = args.path || "";
@@ -437,6 +581,73 @@ async function callTool(name, args) {
         (entry.duration == null && kind !== "image"
           ? "Note: duration unknown (no ffprobe). The browser UI will probe and fill it in; re-read the project before trimming this media."
           : "Ready to use in clips via mediaId.");
+    }
+    case "fablecut_auto_caption": {
+      const proj = readProject();
+      let words;
+      if (args.transcript !== undefined) {
+        words = loadWords(args.transcript);
+      } else {
+        let src = args.path || "";
+        if (!src && args.mediaId) {
+          const m = proj.media.find((x) => x.id === args.mediaId);
+          if (!m) throw new Error("No media " + args.mediaId + " in the project");
+          src = m.src;
+        }
+        if (!src) throw new Error("Pass `transcript`, or `mediaId`/`path` to auto-transcribe");
+        const file = resolveSrcToFile(src);
+        if (!fs.existsSync(file) || !fs.statSync(file).isFile()) throw new Error("File not found: " + src);
+        words = await transcribeAudio(file, args.model);
+      }
+      if (!words.length) throw new Error("No words to caption (empty transcript)");
+      const lines = groupWords(words, args.maxWords || 4, args.maxSeconds || 1.8);
+      const ops = lines.map((line) => ({
+        op: "addClip",
+        clip: {
+          id: "cap_" + uid(),
+          kind: "text",
+          track: args.track || "V3",
+          start: line.start,
+          duration: line.duration,
+          props: {
+            text: line.text,
+            textAnim: args.textAnim || "karaoke",
+            wordRate: line.wordRate,
+            fontSize: 72,
+            bold: true,
+            color: "#ffffff",
+            textShadow: 12,
+            ...(args.props || {}),
+          },
+        },
+      }));
+      saveCheckpoint(structuredClone(proj), "fablecut_auto_caption");
+      const notes = applyPatchOps(proj, ops);
+      proj.revision = (proj.revision || 0) + 1;
+      writeProject(proj);
+      lastReadRevision = proj.revision;
+      return `Added ${lines.length} caption clip(s) on ${args.track || "V3"} (revision ${proj.revision}): ${notes.join(" ")}. UI hot-reloaded. (Checkpointed — fablecut_revert undoes this.)`;
+    }
+    case "fablecut_list_checkpoints": {
+      const list = listCheckpoints(args.limit || 20);
+      if (!list.length)
+        return "No checkpoints yet — one is saved automatically before every fablecut_patch_project / fablecut_set_project / fablecut_auto_caption write.";
+      return list.map((e) =>
+        `rev ${e.revision} — ${e.savedAt} — ${e.reason} — ${e.clips} clip(s), ${e.media} media`
+      ).join("\n");
+    }
+    case "fablecut_revert": {
+      const target = loadCheckpoint(args.revision);
+      if (!target) throw new Error(args.revision != null
+        ? `No checkpoint at revision ${args.revision} — call fablecut_list_checkpoints to see what's available`
+        : "No checkpoints saved yet — one is saved automatically before every write, so make an edit first");
+      const cur = readProject();
+      saveCheckpoint(cur, "before fablecut_revert");
+      const doc = target.doc;
+      doc.revision = (cur.revision || 0) + 1; // reverted content lands as a NEW revision, monotonically ahead
+      writeProject(doc);
+      lastReadRevision = doc.revision;
+      return `Reverted to checkpoint rev ${target.entry.revision} (${target.entry.reason}, saved ${target.entry.savedAt}) — now revision ${doc.revision}, ${doc.clips.length} clip(s). UI hot-reloaded. Call fablecut_revert again to undo this revert.`;
     }
     default:
       throw new Error("Unknown tool: " + name);

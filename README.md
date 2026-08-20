@@ -126,6 +126,9 @@ same time.
 - Kinetic captions: typewriter, word-pop, word-slide, karaoke, **letter-pop**,
   **wave**, **bounce**, **shake**, **clip-reveal**, **zoom-in**, **font-cut**
   (rhythmic typeface cuts), **rise-mask**
+- **Auto-captions from speech** — `fablecut_auto_caption` transcribes a clip
+  (faster-whisper) or takes a transcript from any STT engine and patches
+  karaoke caption lines onto the timeline in one call, no manual merge step
 - **Neon glow** for that TikTok caption look
 - Font editor: system fonts, drop-in custom fonts (`library/fonts/`), and **any
   Google Font by name** — loaded automatically
@@ -233,6 +236,22 @@ Three equivalent control surfaces:
    }
    ```
 
+   **[Mint](https://github.com/Pheem49/Mint)** (the local-first AI
+   assistant / CLI agent) speaks the same stdio MCP protocol — add the server,
+   allow its tools, then let the agent call them:
+
+   ```bash
+   mint mcp add fablemint node --args "<path-to>/FableMint/mcp-server.js"
+   mint mcp allow fablemint "*"
+   mint mcp call fablemint fablecut_status --arguments '{}'   # sanity check
+   ```
+
+   Once added, `fablemint` shows up in Mint's agent loop automatically (chat,
+   `mint code agent "…"`, or any messaging bridge) — no extra config beyond
+   the `mcp add`/`mcp allow` step above. The Desktop/Web app has the same flow
+   under **Settings → MCP servers → custom server** (Name `fablemint`,
+   Command `node`, Args `<path-to>/FableMint/mcp-server.js`).
+
    For another MCP client, register a local stdio server with this equivalent
    command. The exact key names vary by client, but the command and arguments
    do not:
@@ -252,7 +271,13 @@ Three equivalent control surfaces:
 
    Tools: `fablecut_status` (auto-starts the editor), `fablecut_docs`,
    `fablecut_get_project`, `fablecut_set_project`, `fablecut_patch_project`,
-   `fablecut_import_media`, `fablecut_analyze_reference`.
+   `fablecut_import_media`, `fablecut_analyze_reference`, `fablecut_auto_caption`,
+   `fablecut_list_checkpoints`, `fablecut_revert`.
+
+   **Every agent write is checkpointed automatically** — `fablecut_patch_project`,
+   `fablecut_set_project` and `fablecut_auto_caption` each snapshot the document
+   right before writing, so a bad edit is always one `fablecut_revert` away
+   (and reverting is itself undoable). No setup, no separate history UI.
 
    The surface is **token-efficient by design**: agents patch the timeline with
    small ops (`fablecut_patch_project`) instead of round-tripping the whole
@@ -293,10 +318,12 @@ style.css        dark editor theme
 mcp-server.js    stdio MCP server exposing the editor to AI agents
 analyze.js       reference-video analyzer: shots, beats/BPM, energy, drop,
                  music extraction (module + CLI)
+checkpoints.js   automatic pre-write snapshots for fablecut_revert (module)
 CLAUDE.md        the agent manual (schema + recipes) — also served by fablecut_docs
 project.json     your timeline (created on first run; gitignored)
 media/           project footage (gitignored)
 analysis/        cached edit blueprints from /api/analyze (gitignored)
+checkpoints/     pre-write snapshots for fablecut_revert (gitignored)
 library/         default assets: elements/ sfx/ svg/ fonts/
 exports/         finished renders (gitignored)
 ```

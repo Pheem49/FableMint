@@ -19,6 +19,7 @@ const os = require("os");
 const { spawn, spawnSync, execFile } = require("child_process");
 
 const { analyze } = require("./analyze");
+const { saveCheckpoint, listCheckpoints, loadCheckpoint } = require("./checkpoints");
 
 const {
   APP_DIR, DATA_DIR, MEDIA_DIR, EXPORTS_DIR, ANALYSIS_DIR, LIBRARY_DIR,
@@ -377,6 +378,37 @@ const server = http.createServer(async (req, res) => {
       fs.writeFileSync(path.join(ANALYSIS_DIR, path.basename(name, path.extname(name)) + ".json"),
         JSON.stringify(bp, null, 2));
       sendJSON(res, 200, bp);
+    } catch (e) { sendJSON(res, 500, { error: String(e) }); }
+    return;
+  }
+
+  /* API: checkpoints — automatic pre-write snapshots taken by the MCP write
+     tools (see checkpoints.js). GET lists them; POST reverts to one (default:
+     the most recent), itself checkpointing the current state first so the
+     revert can be undone the same way. */
+  if (p === "/api/checkpoints" && req.method === "GET") {
+    const limit = parseInt(url.searchParams.get("limit"), 10);
+    sendJSON(res, 200, listCheckpoints(Number.isFinite(limit) ? limit : undefined));
+    return;
+  }
+  if (p === "/api/checkpoints/revert" && req.method === "POST") {
+    try {
+      const opts = JSON.parse((await readBody(req)).toString("utf8") || "{}");
+      const revision = opts.revision != null ? Number(opts.revision) : undefined;
+      const target = loadCheckpoint(revision);
+      if (!target) {
+        sendJSON(res, 404, { error: revision != null ? `No checkpoint at revision ${revision}` : "No checkpoints saved yet" });
+        return;
+      }
+      let cur = { revision: 0 };
+      try { cur = JSON.parse(fs.readFileSync(PROJECT_FILE, "utf8").replace(new RegExp("^\\uFEFF"), "")); } catch {}
+      if (Array.isArray(cur.clips)) saveCheckpoint(cur, "before revert (UI)");
+      const doc = target.doc;
+      doc.revision = (cur.revision || 0) + 1;
+      const tmp = PROJECT_FILE + ".tmp";
+      fs.writeFileSync(tmp, JSON.stringify(doc, null, 2));
+      fs.renameSync(tmp, PROJECT_FILE);
+      sendJSON(res, 200, { ok: true, revision: doc.revision, revertedTo: target.entry.revision });
     } catch (e) { sendJSON(res, 500, { error: String(e) }); }
     return;
   }

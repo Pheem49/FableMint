@@ -24,6 +24,16 @@ Every Claude Code session then has these tools:
 - `fablecut_import_media` — copy a local file into `./media/` and register it.
 - `fablecut_analyze_reference` — turn a reference video into an edit blueprint
   (shots, beats, BPM, energy, drop) + extract its music. See "Remake a reference video".
+- `fablecut_auto_caption` — turn speech into karaoke caption clips, patched
+  straight onto the timeline. Pass `transcript` (word-timestamp JSON from any
+  STT engine), or `mediaId`/`path` to auto-transcribe with faster-whisper.
+- `fablecut_list_checkpoints` / `fablecut_revert` — every write from
+  `fablecut_patch_project`, `fablecut_set_project` or `fablecut_auto_caption`
+  automatically snapshots the document as it stood immediately before that
+  write. If an edit goes wrong, `fablecut_revert` (no args = most recent)
+  restores the last good state — and since the revert itself is checkpointed,
+  calling `fablecut_revert` again undoes the revert. No setup needed; this is
+  always on.
 
 ### Token-efficient editing (important for agents)
 
@@ -67,9 +77,9 @@ then `/plugin install fablecut@fablecut`) does the registration for you.
 
 ### Where the files are
 
-`project.json`, `media/`, `exports/`, `analysis/` and `library/` normally sit in
-the repo next to `server.js`. Set **`FABLECUT_DATA_DIR`** to move all five
-somewhere else; the code and the static app files stay in the install directory
+`project.json`, `media/`, `exports/`, `analysis/`, `checkpoints/` and `library/`
+normally sit in the repo next to `server.js`. Set **`FABLECUT_DATA_DIR`** to
+move all six somewhere else; the code and the static app files stay in the install directory
 either way. The plugin sets this so a plugin update can replace the install
 directory without touching anyone's timeline or footage. **Don't assume
 `project.json` is beside `mcp-server.js`** — call `fablecut_status`, which
@@ -263,6 +273,7 @@ Examples in `library/svg/`: `sparkles.svg` (loop), `lower-third.svg`,
 | prop | default | notes |
 |---|---|---|
 | `volume` | 1 | 0–2 |
+| `pan` | 0 | −1 (full left) … 1 (full right), stereo. Applies in preview and export; has no effect before the audio graph is created (first Play/Audio-hold in a session — same limitation the Web Audio API imposes on volume-via-native-element, but pan has no native-element fallback at all). |
 | `speed` | 1 | 0.25–4× playback rate. **Keyframable → speed ramps**: with `keyframes.speed` the engine time-remaps (media time = `in` + ∫speed dt), in preview and in the export audio mix. Static case: source window consumed = `duration × speed`, so `in + duration×speed ≤ media.duration`. |
 
 **Text clips only:**
@@ -328,7 +339,7 @@ footage. Example: 0.3 s impact shake over everything =
 `{kind:"adjust", track:"V3", duration:0.3, props:{shake:18}}`.
 
 **Animatable props** (usable in `keyframes`): x, y, scale, rotation, opacity,
-volume, speed, brightness, contrast, saturation, hue, blur, grayscale, sepia,
+volume, pan, speed, brightness, contrast, saturation, hue, blur, grayscale, sepia,
 invert, temperature, tint, vignette, cornerRadius, shake, rgbSplit, grain,
 fontSize, letterSpacing, glow.
 
@@ -483,6 +494,13 @@ font:"Bebas Neue", textAnim:"wave"}` on a dark shot.
 **Reel caption**: text clip with `props: {textAnim:"word-pop", wordRate:0.15,
 strokeWidth:6, bgColor:"#000000", bgOpacity:0.45, fontSize:88}`. `karaoke`
 dims words until "spoken"; `typewriter` for terminal vibes.
+
+**Auto-caption from speech**: `fablecut_auto_caption {mediaId:"m_x"}` (needs
+`pip install faster-whisper` once) transcribes a clip's audio and patches
+karaoke caption lines onto V3 in one call — no manual STT/merge step. Already
+have a transcript (any engine)? Pass it directly:
+`fablecut_auto_caption {transcript:{words:[{word:"hi",start:0,end:0.3}]}}`.
+Tune grouping with `maxWords`/`maxSeconds`, look with `props`/`textAnim`.
 
 **RTL / Hebrew / Arabic caption**: omit `direction` (defaults to `"auto"`) or set
 `direction:"rtl"` explicitly; pick a font with the script's glyphs (Google Fonts

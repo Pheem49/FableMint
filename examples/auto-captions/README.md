@@ -1,5 +1,14 @@
 # Auto-captions example
 
+> **Most agents should use the `fablecut_auto_caption` MCP tool instead** — it
+> does everything below (transcribe with faster-whisper, or accept a
+> transcript from any engine, group into lines, build the caption clips) and
+> patches them straight onto the timeline in one call, no separate script or
+> merge step. See the "Auto-caption from speech" recipe in `CLAUDE.md`. This
+> example remains useful as a dependency-free reference implementation, or if
+> you want the caption JSON as a standalone file to inspect/edit before
+> applying it.
+
 This example converts word-timestamped speech-to-text output into FableCut `kind:"text"` clips with the built-in `karaoke` animation. It does not change the editor or require a specific speech-to-text engine.
 
 ## 1. Produce word timestamps

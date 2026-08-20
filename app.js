@@ -27,6 +27,7 @@ const TRACK_SIZE_PRESETS = {
 // source (e.g. 7.1 surround = 8 channels) — see ensureAudioTrackCount().
 const MAX_AUDIO_TRACKS = 16;
 const TRACK_SIZE_KEY = "fablecut-track-size";
+const PANEL_HIDDEN_KEY = { bin: "fablecut-bin-hidden", inspector: "fablecut-inspector-hidden" };
 const LAST_TRANS_KEY = { in: "fablecut-last-trans-in", out: "fablecut-last-trans-out" };
 const DEFAULT_LAST_TRANS = { type: "fade", duration: 1 };
 const RULER_H = 26;
@@ -39,6 +40,7 @@ const TIMELINE_FIT_FILL = 0.95; // ⇧Z / Fit — clip content fills this fracti
 
 const DEFAULT_PROPS = {
   x: 0, y: 0, scale: 1, rotation: 0, opacity: 1, volume: 1,
+  pan: 0,                                      // stereo pan, -1 (left) .. 1 (right)
   speed: 1,                                    // playback rate (video/audio)
   brightness: 100, contrast: 100, saturation: 100, hue: 0,
   blur: 0, grayscale: 0, sepia: 0, invert: 0,
@@ -64,7 +66,7 @@ const DEFAULT_PROPS = {
   boxFit: false,                               // false = wrap at fixed fontSize; true = scale font to fit box
   vAlign: "middle",                            // top | middle | bottom — vertical align of the text block in the box
 };
-const ANIMATABLE = ["x", "y", "scale", "rotation", "opacity", "volume", "speed",
+const ANIMATABLE = ["x", "y", "scale", "rotation", "opacity", "volume", "pan", "speed",
   "brightness", "contrast", "saturation", "hue", "blur", "grayscale", "sepia", "invert",
   "temperature", "tint", "vignette", "cornerRadius", "shake", "rgbSplit", "grain",
   "fontSize", "letterSpacing", "glow"];
@@ -321,7 +323,8 @@ const els = {
   btnAudioHold: $("btnAudioHold"),
   exportOverlay: $("exportOverlay"), exportProgress: $("exportProgress"),
   exportTitle: $("exportTitle"), exportNote: $("exportNote"),
-  projectName: $("projectName"),
+  projectName: $("projectName"), projectStatus: $("projectStatus"),
+  btnHistory: $("btnHistory"), historyPanel: $("historyPanel"), historyList: $("historyList"),
   aspectSel: $("aspectSel"), fpsSel: $("fpsSel"), btnGuides: $("btnGuides"), btnZoom100: $("btnZoom100"),
   safeOverlay: $("safeOverlay"), btnSpeed: $("btnSpeed"),
   monitorStage: $("monitorStage"), monitorScroll: $("monitorScroll"),
@@ -441,13 +444,13 @@ async function connectServer() {
     const data = await res.json();
     applyProject(data);
     state.connected = true;
-    els.projectName.textContent = project.name + "  ·  🟢 connected";
+    els.projectStatus.textContent = "  ·  🟢 connected";
     listenSSE();
     fetch("/api/export/ffmpeg").then((r) => r.json())
       .then((j) => { state.ffmpeg = !!j.available; }).catch(() => { });
   } catch {
     state.connected = false;
-    els.projectName.textContent = project.name + "  ·  ⚪ local session";
+    els.projectStatus.textContent = "  ·  ⚪ local session";
   }
   await probeMissingMeta();
 }
@@ -577,6 +580,25 @@ function startFolderRename(folderId) {
     if (e.key === "Escape") { e.preventDefault(); row.textContent = getFolder(folderId)?.name || "Folder"; row.blur(); }
   });
 }
+function startProjectRename() {
+  const el = els.projectName;
+  el.contentEditable = "true";
+  el.focus();
+  const sel = window.getSelection(), range = document.createRange();
+  range.selectNodeContents(el); sel.removeAllRanges(); sel.addRange(range);
+  const commit = () => {
+    el.contentEditable = "false";
+    const name = el.textContent.replace(/\s+/g, " ").trim() || "Untitled Project";
+    project.name = name;
+    el.textContent = name;
+    scheduleSave();
+  };
+  el.addEventListener("blur", commit, { once: true });
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+    if (e.key === "Escape") { e.preventDefault(); el.textContent = project.name; el.blur(); }
+  });
+}
 function applyProject(data) {
   const wa = normalizeWorkArea(data.inPoint, data.outPoint);
   const disabledTracks = normalizeDisabledTracks(data.disabledTracks);
@@ -629,6 +651,7 @@ function applyProject(data) {
   updateWorkArea();
   syncTrimIOButton();
   syncAllTrackDisabledUI();
+  els.projectName.textContent = project.name;
 }
 function scheduleSave() {
   state.dirtyTimeline = true;
@@ -2929,7 +2952,7 @@ function renderInspector(lite) {
   let html = (state.selIds.size > 1
     ? `<div class="insp-multi">${state.selIds.size} clips selected — drag moves them together, Del deletes all. Fields below edit the primary (white-outlined) clip.</div>`
     : "") + `<div class="insp-section"><h3>Clip — ${c.kind}</h3>
-    ${row("Name", `<input type="text" data-k="name" value="${c.name.replace(/"/g, "&quot;")}">`)}
+    ${row("Name", `<input type="text" data-k="name" value="${(c.name || "").replace(/"/g, "&quot;")}">`)}
     ${c.mediaId ? row("Source", `<button type="button" class="btn tiny style-picker-btn" data-media-open title="Replace this clip's media — keeps position, trim, keyframes and effects">${escapeHtml((getMedia(c.mediaId) || {}).name || "Missing media")} ▾</button>`) : ""}
     ${row("Start (s)", `<input type="number" data-k="start" step="0.01" value="${c.start.toFixed(2)}">`)}
     ${row("Length (s)", `<input type="number" data-k="duration" step="0.01" value="${c.duration.toFixed(2)}">`)}
@@ -3001,6 +3024,7 @@ function renderInspector(lite) {
     html += `<div class="insp-section"><h3>Audio / Time</h3>
       ${chLabel ? row("Channel", `<span style="opacity:.75">${chLabel}</span>`) : ""}
       ${slider("volume", 0, 2, 0.01, p.volume)}
+      ${slider("pan", -1, 1, 0.01, p.pan)}
       ${slider("speed", 0.25, 4, 0.05, p.speed, "×")}
     </div>`;
   }
@@ -3210,7 +3234,7 @@ function renderInspector(lite) {
 /* ── Keyframe graphs (program-monitor left gutter) ── */
 const KF_GRAPH_LABEL = {
   x: "Pos X", y: "Pos Y", scale: "Scale", rotation: "Rotation", opacity: "Opacity",
-  volume: "Volume", speed: "Speed", brightness: "Bright", contrast: "Contrast",
+  volume: "Volume", pan: "Pan", speed: "Speed", brightness: "Bright", contrast: "Contrast",
   saturation: "Sat", hue: "Hue", blur: "Blur", grayscale: "Gray", sepia: "Sepia",
   invert: "Invert", temperature: "Temp", tint: "Tint", vignette: "Vignette",
   cornerRadius: "Radius", shake: "Shake", rgbSplit: "RGB", grain: "Grain",
@@ -3392,6 +3416,7 @@ function releaseClipEl(id) {
     try { g.disconnect(); } catch {}
     if (g._fcOut) { try { g._fcOut.disconnect(); } catch {} }
     if (g._fcSplit) { try { g._fcSplit.disconnect(); } catch {} }
+    if (g._pan) { try { g._pan.disconnect(); } catch {} }
     runtime.clipGain.delete(id);
   }
 }
@@ -3456,16 +3481,21 @@ function hookAudio(c, el) {
       g._fcOut = merge;
       g._fcChannel = ch;
     }
+    // Pan sits downstream of channel isolation so it always acts on the final
+    // stereo signal; routeClipGain (re)connects this to the current track bus.
+    const pan = ctx.createStereoPanner();
+    (merge || g).connect(pan);
+    g._pan = pan;
     runtime.clipGain.set(c.id, g);
     routeClipGain(c);
   } catch {}
 }
-/** Reconnect a clip's gain to the correct track bus (or master for video tracks). */
+/** Reconnect a clip's gain(+pan) to the correct track bus (or master for video tracks). */
 function routeClipGain(c) {
   const g = runtime.clipGain.get(c.id);
   if (!g || !runtime.audio) return;
   const bus = runtime.audio.trackBus[c.track] || runtime.audio.master;
-  const out = g._fcOut || g;
+  const out = g._pan || g._fcOut || g;
   if (out._fcBus === bus) return;
   try { out.disconnect(); } catch {}
   out.connect(bus);
@@ -3769,6 +3799,7 @@ function disposeAudioHoldNode(n) {
   try { n.gain.disconnect(); } catch { }
   if (n.split) { try { n.split.disconnect(); } catch { } }
   if (n.merge) { try { n.merge.disconnect(); } catch { } }
+  if (n.pan) { try { n.pan.disconnect(); } catch { } }
 }
 function stopAudioHoldNodes() {
   audioHoldGen++;
@@ -3835,9 +3866,12 @@ function refreshAudioHold() {
       g.gain.value = vol;
       const ch = c.props?.audioChannel;
       const { out, split, merge } = connectChannelIsolated(audio.ctx, src, g, ch);
+      const pan = audio.ctx.createStereoPanner();
+      pan.pan.value = clamp(+p.pan || 0, -1, 1);
       const bus = audio.trackBus[c.track] || audio.master;
-      out.connect(bus);
-      const node = { src, gain: g, split, merge };
+      out.connect(pan);
+      pan.connect(bus);
+      const node = { src, gain: g, split, merge, pan };
       try { src.start(0); } catch { disposeAudioHoldNode(node); return; }
       // Re-check after start: a newer refresh/stop may have run while we built the graph.
       if (gen !== audioHoldGen || !state.audioHold || state.playing) {
@@ -3908,8 +3942,12 @@ function syncMedia() {
       if (Math.abs(el.currentTime - mt) > 0.25 * eff) { try { el.currentTime = mt; } catch {} }
       const vol = clamp(p.volume, 0, 4);
       const g = runtime.clipGain.get(c.id);
-      if (g) g.gain.value = vol;
-      else el.volume = clamp(vol, 0, 1);
+      if (g) {
+        g.gain.value = vol;
+        // Pan has no HTMLMediaElement equivalent — it only takes effect once the
+        // Web Audio graph exists (after the first ensureAudio(), e.g. first Play).
+        if (g._pan) g._pan.pan.value = clamp(+p.pan || 0, -1, 1);
+      } else el.volume = clamp(vol, 0, 1);
     } else {
       if (!el.paused) el.pause();
       const g = runtime.clipGain.get(c.id);
@@ -5281,7 +5319,7 @@ function encodeWAV(buf) {
   }
   return new Blob([ab], { type: "audio/wav" });
 }
-/* Mix all audio-bearing clips offline, honoring volume keyframes + fades */
+/* Mix all audio-bearing clips offline, honoring volume/pan keyframes + fades */
 async function renderAudioMix(dur) {
   const jobs = [];
   for (const c of project.clips) {
@@ -5304,7 +5342,13 @@ async function renderAudioMix(dur) {
     g.gain.setValueCurveAtTime(curve, Math.max(0, c.start), Math.max(0.01, c.duration));
     const ch = c.props?.audioChannel;
     const { out } = connectChannelIsolated(off, src, g, ch);
-    out.connect(off.destination);
+    const pan = off.createStereoPanner();
+    const panCurve = new Float32Array(n);
+    for (let i = 0; i < n; i++)
+      panCurve[i] = clamp(evalProps(c, c.start + (i / (n - 1)) * c.duration).pan, -1, 1);
+    pan.pan.setValueCurveAtTime(panCurve, Math.max(0, c.start), Math.max(0.01, c.duration));
+    out.connect(pan);
+    pan.connect(off.destination);
     if (hasSpeedRamp(c)) {
       const rc = new Float32Array(n);
       for (let i = 0; i < n; i++)
@@ -5531,6 +5575,7 @@ if (els.btnAudioHold) {
   els.btnAudioHold.addEventListener("click", () => setAudioHold(!state.audioHold));
 }
 $("btnLayoutReset").addEventListener("click", restoreDefaultLayout);
+els.projectName.addEventListener("dblclick", startProjectRename);
 $("trackSizeGroup").addEventListener("click", (e) => {
   const b = e.target.closest("[data-track-size]");
   if (b) setTrackSize(b.dataset.trackSize);
@@ -5961,6 +6006,8 @@ function setTrackSize(size, { persist = true, fitPane = true } = {}) {
 function restoreDefaultLayout() {
   setTrackSize("l", { persist: true, fitPane: false });
   resetTimelineHeight();
+  setPanelHidden("bin", false);
+  setPanelHidden("inspector", false);
 }
 function clampTimelineHeight() {
   const cur = $("timelinePanel")?.getBoundingClientRect().height;
@@ -6006,8 +6053,90 @@ function initPanelSplit() {
   });
 }
 
+/* ── Side panel show/hide (Assets, Inspector) ── */
+function setPanelHidden(which, hidden, { persist = true } = {}) {
+  $("app").querySelector(".upper").classList.toggle(which + "-hidden", hidden);
+  $("btnToggle" + (which === "bin" ? "Bin" : "Inspector")).classList.toggle("on", !hidden);
+  if (persist) localStorage.setItem(PANEL_HIDDEN_KEY[which], hidden ? "1" : "");
+}
+function initSidePanelToggles() {
+  for (const which of ["bin", "inspector"]) {
+    setPanelHidden(which, !!localStorage.getItem(PANEL_HIDDEN_KEY[which]), { persist: false });
+    $("btnToggle" + (which === "bin" ? "Bin" : "Inspector")).addEventListener("click", () => {
+      const nowHidden = !$("app").querySelector(".upper").classList.contains(which + "-hidden");
+      setPanelHidden(which, nowHidden);
+    });
+  }
+}
+
+/* ── Checkpoint history dropdown ── */
+function relativeTime(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  return Math.floor(s / 86400) + "d ago";
+}
+async function refreshHistoryList() {
+  els.historyList.textContent = "";
+  let list = [];
+  try { list = await (await fetch("/api/checkpoints?limit=30", { cache: "no-store" })).json(); } catch { }
+  if (!Array.isArray(list) || !list.length) {
+    const empty = document.createElement("div");
+    empty.className = "history-empty";
+    empty.textContent = "No checkpoints yet — one is saved automatically before every agent edit.";
+    els.historyList.appendChild(empty);
+    return;
+  }
+  for (const e of list) {
+    const row = document.createElement("div");
+    row.className = "history-row";
+    row.innerHTML = `
+      <div class="history-row-info">
+        <div class="history-row-top">rev ${e.revision} · ${e.clips} clip${e.clips === 1 ? "" : "s"}</div>
+        <div class="history-row-sub" title="${e.reason} · ${e.savedAt}">${relativeTime(e.savedAt)} · ${e.reason}</div>
+      </div>
+      <button type="button" class="btn tiny history-row-revert" data-revert="${e.revision}">Revert</button>`;
+    els.historyList.appendChild(row);
+  }
+}
+async function revertToCheckpoint(revision) {
+  try {
+    const res = await fetch("/api/checkpoints/revert", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ revision }),
+    });
+    const data = await res.json();
+    if (!res.ok) { toast(data.error || "Revert failed"); return; }
+    await syncFromServer(true);
+    toast(`Reverted to rev ${data.revertedTo} — call again to undo`);
+    await refreshHistoryList();
+  } catch { toast("Revert failed"); }
+}
+function setHistoryPanelOpen(open) {
+  els.historyPanel.classList.toggle("hidden", !open);
+  els.btnHistory.classList.toggle("on", open);
+  if (open) refreshHistoryList();
+}
+function initHistoryPanel() {
+  els.btnHistory.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setHistoryPanelOpen(els.historyPanel.classList.contains("hidden"));
+  });
+  els.historyList.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-revert]");
+    if (btn) revertToCheckpoint(Number(btn.dataset.revert));
+  });
+  document.addEventListener("click", (e) => {
+    if (!els.historyPanel.classList.contains("hidden") &&
+        !e.target.closest(".history-wrap")) setHistoryPanelOpen(false);
+  });
+}
+
 /* ── Boot ── */
 loadSettings();
+initHistoryPanel();
+initSidePanelToggles();
 initPanelSplit();
 buildTrackDOM();
 rebuildClips();

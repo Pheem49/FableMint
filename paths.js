@@ -27,6 +27,7 @@ const SPLIT = DATA_DIR !== APP_DIR;
 const MEDIA_DIR = path.join(DATA_DIR, "media");
 const EXPORTS_DIR = path.join(DATA_DIR, "exports");
 const ANALYSIS_DIR = path.join(DATA_DIR, "analysis");
+const CHECKPOINTS_DIR = path.join(DATA_DIR, "checkpoints");
 const LIBRARY_DIR = path.join(DATA_DIR, "library");
 const PROJECT_FILE = path.join(DATA_DIR, "project.json");
 const LIBRARY_SUBDIRS = ["sfx", "elements", "svg", "fonts"];
@@ -54,7 +55,7 @@ function seedLibrary() {
 /* Create the writable tree. Safe to call from both servers; whoever runs first
    wins and the other no-ops. */
 function ensureDirs() {
-  for (const d of [DATA_DIR, MEDIA_DIR, EXPORTS_DIR, ANALYSIS_DIR])
+  for (const d of [DATA_DIR, MEDIA_DIR, EXPORTS_DIR, ANALYSIS_DIR, CHECKPOINTS_DIR])
     fs.mkdirSync(d, { recursive: true });
   for (const d of LIBRARY_SUBDIRS)
     fs.mkdirSync(path.join(LIBRARY_DIR, d), { recursive: true });
@@ -63,6 +64,6 @@ function ensureDirs() {
 
 module.exports = {
   APP_DIR, DATA_DIR, SPLIT,
-  MEDIA_DIR, EXPORTS_DIR, ANALYSIS_DIR, LIBRARY_DIR, PROJECT_FILE,
+  MEDIA_DIR, EXPORTS_DIR, ANALYSIS_DIR, CHECKPOINTS_DIR, LIBRARY_DIR, PROJECT_FILE,
   LIBRARY_SUBDIRS, ensureDirs,
 };
