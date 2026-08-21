@@ -19,6 +19,13 @@ You edit video by patching that document; the open editor UI hot-reloads within
    (`{section:"props"}`, `{section:"Recipes"}`) rather than the whole document.
    Skip it entirely if the schema is already in context.
 
+**"Add a kinetic caption / glitch transition / chroma key" etc. is a request
+to apply a capability FableCut already has — not a feature request.** Match it
+to a prop, `textAnim` value, `filterPreset`, or transition type in the manual
+and patch `project.json`. Only open `app.js`/`server.js` if the user
+explicitly asks to change FableCut itself, or the capability truly isn't in
+the manual.
+
 ## Making edits
 
 **Prefer `fablecut_patch_project`.** It sends only what changes, re-reads the

@@ -9,6 +9,32 @@ No build step, no npm dependencies.
 the `fablecut_docs` MCP tool, which returns it) has everything needed to fully
 drive the editor.
 
+## "Add an X effect" is a timeline command, not a feature request
+
+Every effect this document lists — kinetic/animated captions (`textAnim`),
+transitions, chroma key, speed ramps, filter presets, adjustment layers, SVG
+overlays, keyframe animation — **already exists in FableCut.** When a user
+says "add a kinetic caption effect," "give this a glitch transition," "make
+the text pop," etc., that is an instruction to apply an existing capability to
+the *current project* via `fablecut_patch_project` (or a direct `project.json`
+edit) — never a request to add a new feature to FableCut's own source
+(`app.js`/`server.js`/`mcp-server.js`).
+
+Concretely: on any ambiguous "add X" request, first check the props table,
+`textAnim` list, `filterPreset` list, transition types, and Recipes section
+below for a match — **before** opening `app.js`, grepping the compositor, or
+entering plan mode to design new architecture. "Kinetic caption," for
+example, is exactly `textAnim: "wave"` / `"letter-pop"` / `"bounce"` etc. —
+see the Text props table and the "Kinetic font-cut title" recipe.
+
+Only treat a request as actual FableCut *development* (editing the app's own
+source instead of `project.json`) when:
+- the user explicitly asks to modify FableCut/FableMint itself ("add support
+  for X to the editor," "change how the compositor renders Y"), or
+- the capability genuinely isn't covered by anything in this document, and
+  the user confirms they still want it built after being told it's not
+  built in.
+
 ## MCP connection (preferred — works from any session, any directory)
 
 Register the MCP server (`mcp-server.js`) once at user scope as `fablecut`:
